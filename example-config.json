@@ -1,0 +1,6 @@
+{
+	"docker.": {
+		"type": "containers",
+		"socket": "unix:///var/run/docker.sock"
+	}
+}

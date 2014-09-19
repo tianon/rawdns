@@ -1,6 +1,8 @@
 package main
 
 import (
+	"encoding/json"
+	"io/ioutil"
 	"log"
 	"net"
 	"os"
@@ -11,21 +13,35 @@ import (
 	"github.com/samalba/dockerclient"
 )
 
-var docker *dockerclient.DockerClient
+type Config map[string]DomainConfig // "docker.": { ... }
+
+type DomainConfig struct {
+	Type   string `json:"type"`   // "containers"
+	Socket string `json:"socket"` // "unix:///var/run/docker.sock"
+}
+
+var config Config
 
 func main() {
-	dockerHost := os.Getenv("DOCKER_HOST")
-	if dockerHost == "" {
-		dockerHost = "unix:///var/run/docker.sock"
-	}
-
-	var err error
-	docker, err = dockerclient.NewDockerClient(dockerHost, nil)
+	configFile := "example-config.json" // TODO lol
+	configData, err := ioutil.ReadFile(configFile)
 	if err != nil {
-		log.Fatalf("fatal: error initializing Docker client: %v\n", err)
+		log.Fatalf("error: unable to read config file %s: %v\n", configFile, err)
+	}
+	err = json.Unmarshal(configData, &config)
+	if err != nil {
+		log.Fatalf("error: unable to process config file data from %s: %v\n", configFile, err)
 	}
 
-	dns.HandleFunc("docker.", handleDockerRequest)
+	for domain := range config {
+		log.Printf("listening on domain: %s\n", domain)
+		// TODO there must be a better way to pass "domain" along without an anonymous function AND copied variable
+		dCopy := domain
+		dns.HandleFunc(dCopy, func(w dns.ResponseWriter, r *dns.Msg) {
+			handleDockerRequest(dCopy, w, r)
+		})
+	}
+
 	go serve("tcp", ":53")
 	go serve("udp", ":53")
 
@@ -47,21 +63,49 @@ func serve(net, addr string) {
 	}
 }
 
-func handleDockerRequest(w dns.ResponseWriter, r *dns.Msg) {
+func handleDockerRequest(domain string, w dns.ResponseWriter, r *dns.Msg) {
 	m := new(dns.Msg)
 	m.SetReply(r)
 	defer w.WriteMsg(m)
 
+	dockerHost := config[domain].Socket
+	if dockerHost == "" {
+		dockerHost = os.Getenv("DOCKER_HOST")
+	}
+	if dockerHost == "" {
+		dockerHost = "unix:///var/run/docker.sock"
+	}
+	docker, err := dockerclient.NewDockerClient(dockerHost, nil)
+	if err != nil {
+		log.Printf("error: initializing Docker client: %v\n", err)
+	}
+
 	name := r.Question[0].Name
-	if !strings.HasSuffix(name, ".docker.") {
-		log.Printf("error: request for unknown domain %s\n", name)
+	domainSuffix := "." + dns.Fqdn(domain)
+	if !strings.HasSuffix(name, domainSuffix) {
+		log.Printf("error: request for unknown domain %s (in %s)\n", name, domain)
 		return
 	}
-	containerName := name[:len(name)-len(".docker.")]
+	containerName := name[:len(name)-len(domainSuffix)]
 
 	container, err := docker.InspectContainer(containerName)
+	if err != nil && strings.Contains(containerName, ".") {
+		// we have something like "db.app", so let's try looking up a "app/db" container (linking!)
+		parts := strings.Split(containerName, ".")
+		var linkedContainerName string
+		for i := range parts {
+			linkedContainerName += "/" + parts[len(parts)-i-1]
+		}
+		container, err = docker.InspectContainer(linkedContainerName)
+	}
 	if err != nil {
 		log.Printf("error: failed to lookup container %s: %v\n", containerName, err)
+		return
+	}
+
+	containerIp := container.NetworkSettings.IpAddress
+	if containerIp == "" {
+		log.Printf("error: container %s is IP-less\n", containerName)
 		return
 	}
 
@@ -69,7 +113,7 @@ func handleDockerRequest(w dns.ResponseWriter, r *dns.Msg) {
 	case dns.TypeA:
 		rr := new(dns.A)
 		rr.Hdr = dns.RR_Header{Name: name, Rrtype: dns.TypeA, Class: dns.ClassINET, Ttl: 0}
-		rr.A = net.ParseIP(container.NetworkSettings.IpAddress)
+		rr.A = net.ParseIP(containerIp)
 		m.Answer = append(m.Answer, rr)
 
 	case dns.TypeAAAA:
