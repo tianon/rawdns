@@ -126,14 +126,17 @@ func handleDockerRequest(domain string, w dns.ResponseWriter, r *dns.Msg) {
 		return
 	}
 
+	aRecord := new(dns.A)
+	aRecord.Hdr = dns.RR_Header{Name: name, Rrtype: dns.TypeA, Class: dns.ClassINET, Ttl: 0}
+	aRecord.A = net.ParseIP(containerIp)
+
 	switch r.Question[0].Qtype {
 	case dns.TypeA:
-		rr := new(dns.A)
-		rr.Hdr = dns.RR_Header{Name: name, Rrtype: dns.TypeA, Class: dns.ClassINET, Ttl: 0}
-		rr.A = net.ParseIP(containerIp)
-		m.Answer = append(m.Answer, rr)
+		m.Answer = append(m.Answer, aRecord)
 
 	case dns.TypeAAAA:
+		m.Extra = append(m.Extra, aRecord)
+
 		//rr := new(dns.AAAA)
 		//rr.Hdr = dns.RR_Header{Name: r.Question[0].Name, Rrtype: dns.TypeAAAA, Class: dns.ClassINET, Ttl: 0}
 		//rr.AAAA = container.NetworkSettings.Ipv6AddressesAsMultipleAnswerEntries
