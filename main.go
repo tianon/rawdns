@@ -13,11 +13,16 @@ import (
 	"github.com/samalba/dockerclient"
 )
 
-type Config map[string]DomainConfig // "docker.": { ... }
+type Config map[string]DomainConfig // { "docker.": { ... }, ".": { ... } }
 
 type DomainConfig struct {
-	Type   string `json:"type"`   // "containers"
+	Type string `json:"type"` // "containers" or "forwarding"
+
+	// "type": "containers"
 	Socket string `json:"socket"` // "unix:///var/run/docker.sock"
+
+	// "type": "forwarding"
+	Nameservers []string `json:"nameservers"` // [ "8.8.8.8", "8.8.4.4" ]
 }
 
 var config Config
@@ -34,12 +39,19 @@ func main() {
 	}
 
 	for domain := range config {
+		switch config[domain].Type {
+		case "containers":
+			// TODO there must be a better way to pass "domain" along without an anonymous function AND copied variable
+			dCopy := domain
+			dns.HandleFunc(dCopy, func(w dns.ResponseWriter, r *dns.Msg) {
+				handleDockerRequest(dCopy, w, r)
+			})
+			// TODO case "forwarding":
+		default:
+			log.Printf("error: unknown domain type on %s: %s\n", domain, config[domain].Type)
+			continue
+		}
 		log.Printf("listening on domain: %s\n", domain)
-		// TODO there must be a better way to pass "domain" along without an anonymous function AND copied variable
-		dCopy := domain
-		dns.HandleFunc(dCopy, func(w dns.ResponseWriter, r *dns.Msg) {
-			handleDockerRequest(dCopy, w, r)
-		})
 	}
 
 	go serve("tcp", ":53")

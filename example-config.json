@@ -2,5 +2,9 @@
 	"docker.": {
 		"type": "containers",
 		"socket": "unix:///var/run/docker.sock"
+	},
+	".": {
+		"type": "forwarding",
+		"nameservers": [ "8.8.8.8", "8.8.4.4" ]
 	}
 }
