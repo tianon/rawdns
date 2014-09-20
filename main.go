@@ -22,7 +22,7 @@ type DomainConfig struct {
 	Socket string `json:"socket"` // "unix:///var/run/docker.sock"
 
 	// "type": "forwarding"
-	Nameservers []string `json:"nameservers"` // [ "8.8.8.8", "8.8.4.4" ]
+	Nameservers []string `json:"nameservers"` // [ "8.8.8.8:53", "8.8.4.4:53" ]
 }
 
 var config Config
@@ -46,7 +46,12 @@ func main() {
 			dns.HandleFunc(dCopy, func(w dns.ResponseWriter, r *dns.Msg) {
 				handleDockerRequest(dCopy, w, r)
 			})
-			// TODO case "forwarding":
+		case "forwarding":
+			// TODO there must be a better way to pass "domain" along without an anonymous function AND copied variable
+			nameservers := config[domain].Nameservers
+			dns.HandleFunc(domain, func(w dns.ResponseWriter, r *dns.Msg) {
+				handleForwarding(nameservers, w, r)
+			})
 		default:
 			log.Printf("error: unknown domain type on %s: %s\n", domain, config[domain].Type)
 			continue
