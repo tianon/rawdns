@@ -22,7 +22,7 @@ type DomainConfig struct {
 	Socket string `json:"socket"` // "unix:///var/run/docker.sock"
 
 	// "type": "forwarding"
-	Nameservers []string `json:"nameservers"` // [ "8.8.8.8:53", "8.8.4.4:53" ]
+	Nameservers []string `json:"nameservers"` // [ "8.8.8.8", "8.8.4.4" ]
 }
 
 var config Config

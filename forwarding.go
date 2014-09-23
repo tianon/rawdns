@@ -9,6 +9,7 @@ package main
 import (
 	"log"
 	"net"
+	"strings"
 	"time"
 
 	"github.com/miekg/dns"
@@ -43,12 +44,11 @@ func handleForwarding(nameservers []string, w dns.ResponseWriter, req *dns.Msg) 
 		dnsClient.Net = "tcp"
 	}
 Redo:
-	switch tcp {
-	case false:
-		r, _, err = dnsClient.Exchange(req, nameservers[nsid])
-	case true:
-		r, _, err = dnsClient.Exchange(req, nameservers[nsid])
+	nameserver := nameservers[nsid]
+	if i := strings.Index(nameserver, ":"); i < 0 {
+		nameserver += ":53"
 	}
+	r, _, err = dnsClient.Exchange(req, nameserver)
 	if err == nil {
 		r.Compress = true
 		w.WriteMsg(r)
