@@ -63,7 +63,7 @@ func main() {
 	go serve("udp", ":53")
 
 	sig := make(chan os.Signal)
-	signal.Notify(sig)
+	signal.Notify(sig, os.Interrupt, os.Kill)
 	for {
 		select {
 		case s := <-sig:
