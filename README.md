@@ -1,5 +1,8 @@
 # rawdns
 
+- [GitHub](https://github.com/tianon/rawdns)
+- [Docker Hub](https://registry.hub.docker.com/u/tianon/rawdns/)
+
 ```json
 {
 	"docker.": {
