@@ -28,7 +28,10 @@ type DomainConfig struct {
 var config Config
 
 func main() {
-	configFile := "example-config.json" // TODO lol
+	configFile := "example-config.json"
+	if len(os.Args) > 1 {
+		configFile = os.Args[1]
+	}
 	configData, err := ioutil.ReadFile(configFile)
 	if err != nil {
 		log.Fatalf("error: unable to read config file %s: %v\n", configFile, err)
