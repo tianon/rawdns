@@ -3,6 +3,8 @@
 - [GitHub](https://github.com/tianon/rawdns)
 - [Docker Hub](https://registry.hub.docker.com/u/tianon/rawdns/)
 
+Save as `/etc/rawdns.json`:
+
 ```json
 {
 	"docker.": {
@@ -20,8 +22,10 @@
 }
 ```
 
+Then:
+
 ```console
-$ docker run --rm -p 53:53/udp -v /var/run/docker.sock:/var/run/docker.sock tianon/rawdns
+$ docker run --rm -p 53:53/udp -v /var/run/docker.sock:/var/run/docker.sock /etc/rawdns.json:/etc/rawdns.json:ro tianon/rawdns rawdns /etc/rawdns.json
 2014/09/23 14:46:10 listening on domain: docker.
 2014/09/23 14:46:10 listening on domain: local.
 2014/09/23 14:46:10 listening on domain: .
