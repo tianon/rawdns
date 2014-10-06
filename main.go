@@ -10,7 +10,6 @@ import (
 	"strings"
 
 	"github.com/miekg/dns"
-	"github.com/samalba/dockerclient"
 )
 
 type Config map[string]DomainConfig // { "docker.": { ... }, ".": { ... } }
@@ -88,18 +87,6 @@ func handleDockerRequest(domain string, w dns.ResponseWriter, r *dns.Msg) {
 	m.SetReply(r)
 	defer w.WriteMsg(m)
 
-	dockerHost := config[domain].Socket
-	if dockerHost == "" {
-		dockerHost = os.Getenv("DOCKER_HOST")
-	}
-	if dockerHost == "" {
-		dockerHost = "unix:///var/run/docker.sock"
-	}
-	docker, err := dockerclient.NewDockerClient(dockerHost, nil)
-	if err != nil {
-		log.Printf("error: initializing Docker client: %v\n", err)
-	}
-
 	name := r.Question[0].Name
 	domainSuffix := "." + dns.Fqdn(domain)
 	if !strings.HasSuffix(name, domainSuffix) {
@@ -108,7 +95,7 @@ func handleDockerRequest(domain string, w dns.ResponseWriter, r *dns.Msg) {
 	}
 	containerName := name[:len(name)-len(domainSuffix)]
 
-	container, err := docker.InspectContainer(containerName)
+	container, err := dockerInspectContainer(config[domain].Socket, containerName)
 	if err != nil && strings.Contains(containerName, ".") {
 		// we have something like "db.app", so let's try looking up a "app/db" container (linking!)
 		parts := strings.Split(containerName, ".")
@@ -116,7 +103,7 @@ func handleDockerRequest(domain string, w dns.ResponseWriter, r *dns.Msg) {
 		for i := range parts {
 			linkedContainerName += "/" + parts[len(parts)-i-1]
 		}
-		container, err = docker.InspectContainer(linkedContainerName)
+		container, err = dockerInspectContainer(config[domain].Socket, linkedContainerName)
 	}
 	if err != nil {
 		log.Printf("error: failed to lookup container %s: %v\n", containerName, err)
