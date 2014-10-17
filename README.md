@@ -31,6 +31,10 @@ $ docker run --rm -p 53:53/udp -v /var/run/docker.sock:/var/run/docker.sock -v /
 2014/09/23 14:46:10 listening on domain: .
 ```
 
+The most-specific domain gets the request (ie, if you have both `docker.` and `containers.docker.` and you do a lookup for `something.container.docker`, you'll get back the IP of the container named `something`).
+
+The default configuration only includes `docker.` going to `/var/run/docker.sock` and `.` going to `8.8.8.8`+`8.8.4.4`.
+
 ## wat
 
 Since DNS is a protocol (which is a type of API), and Docker has an API, it makes a lot more sense to have DNS be a raw interface to Docker than it does to treat DNS like a database and try to synchronize the two data sources.
