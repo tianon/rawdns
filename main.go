@@ -82,54 +82,69 @@ func serve(net, addr string) {
 	}
 }
 
+func dnsAppend(q dns.Question, m *dns.Msg, rr dns.RR) {
+	hdr := dns.RR_Header{Name: q.Name, Class: dns.ClassINET, Ttl: 0}
+	if rrS, ok := rr.(*dns.A); ok {
+		hdr.Rrtype = dns.TypeA
+		rrS.Hdr = hdr
+	} else if rrS, ok := rr.(*dns.AAAA); ok {
+		hdr.Rrtype = dns.TypeAAAA
+		rrS.Hdr = hdr
+	} else if rrS, ok := rr.(*dns.CNAME); ok {
+		hdr.Rrtype = dns.TypeCNAME
+		rrS.Hdr = hdr
+	} else if rrS, ok := rr.(*dns.TXT); ok {
+		hdr.Rrtype = dns.TypeTXT
+		rrS.Hdr = hdr
+	} else {
+		log.Printf("unknown RR type: %+v\n", rr)
+		return
+	}
+	if q.Qtype == rr.Header().Rrtype {
+		m.Answer = append(m.Answer, rr)
+	} else {
+		m.Extra = append(m.Extra, rr)
+	}
+}
+
 func handleDockerRequest(domain string, w dns.ResponseWriter, r *dns.Msg) {
 	m := new(dns.Msg)
 	m.SetReply(r)
 	defer w.WriteMsg(m)
 
-	name := r.Question[0].Name
 	domainSuffix := "." + dns.Fqdn(domain)
-	if !strings.HasSuffix(name, domainSuffix) {
-		log.Printf("error: request for unknown domain %s (in %s)\n", name, domain)
-		return
-	}
-	containerName := name[:len(name)-len(domainSuffix)]
-
-	container, err := dockerInspectContainer(config[domain].Socket, containerName)
-	if err != nil && strings.Contains(containerName, ".") {
-		// we have something like "db.app", so let's try looking up a "app/db" container (linking!)
-		parts := strings.Split(containerName, ".")
-		var linkedContainerName string
-		for i := range parts {
-			linkedContainerName += "/" + parts[len(parts)-i-1]
+	for _, q := range r.Question {
+		name := q.Name
+		if !strings.HasSuffix(name, domainSuffix) {
+			log.Printf("error: request for unknown domain %s (in %s)\n", name, domain)
+			return
 		}
-		container, err = dockerInspectContainer(config[domain].Socket, linkedContainerName)
-	}
-	if err != nil {
-		log.Printf("error: failed to lookup container %s: %v\n", containerName, err)
-		return
-	}
+		containerName := name[:len(name)-len(domainSuffix)]
 
-	containerIp := container.NetworkSettings.IpAddress
-	if containerIp == "" {
-		log.Printf("error: container %s is IP-less\n", containerName)
-		return
-	}
+		container, err := dockerInspectContainer(config[domain].Socket, containerName)
+		if err != nil && strings.Contains(containerName, ".") {
+			// we have something like "db.app", so let's try looking up a "app/db" container (linking!)
+			parts := strings.Split(containerName, ".")
+			var linkedContainerName string
+			for i := range parts {
+				linkedContainerName += "/" + parts[len(parts)-i-1]
+			}
+			container, err = dockerInspectContainer(config[domain].Socket, linkedContainerName)
+		}
+		if err != nil {
+			log.Printf("error: failed to lookup container %s: %v\n", containerName, err)
+			return
+		}
 
-	aRecord := new(dns.A)
-	aRecord.Hdr = dns.RR_Header{Name: name, Rrtype: dns.TypeA, Class: dns.ClassINET, Ttl: 0}
-	aRecord.A = net.ParseIP(containerIp)
+		containerIp := container.NetworkSettings.IpAddress
+		if containerIp == "" {
+			log.Printf("error: container %s is IP-less\n", containerName)
+			return
+		}
 
-	switch r.Question[0].Qtype {
-	case dns.TypeA:
-		m.Answer = append(m.Answer, aRecord)
+		dnsAppend(q, m, &dns.A{A: containerIp})
 
-	case dns.TypeAAAA:
-		m.Extra = append(m.Extra, aRecord)
-
-		//rr := new(dns.AAAA)
-		//rr.Hdr = dns.RR_Header{Name: r.Question[0].Name, Rrtype: dns.TypeAAAA, Class: dns.ClassINET, Ttl: 0}
-		//rr.AAAA = container.NetworkSettings.Ipv6AddressesAsMultipleAnswerEntries
+		//dnsAppend(q, m, &dns.AAAA{AAAA: container.NetworkSettings.Ipv6AddressesAsMultipleAnswerEntries})
 		// TODO IPv6 support (when Docker itself has such a thing...)
 	}
 }
