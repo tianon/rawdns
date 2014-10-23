@@ -1,7 +1,8 @@
 # rawdns
 
-- [GitHub](https://github.com/tianon/rawdns)
 - [Docker Hub](https://registry.hub.docker.com/u/tianon/rawdns/)
+- [GitHub](https://github.com/tianon/rawdns)
+- [![Build Status](https://travis-ci.org/tianon/rawdns.svg)](https://travis-ci.org/tianon/rawdns)
 
 Save as `/etc/rawdns.json`:
 
