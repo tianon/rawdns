@@ -142,9 +142,9 @@ func handleDockerRequest(domain string, w dns.ResponseWriter, r *dns.Msg) {
 			return
 		}
 
-		dnsAppend(q, m, &dns.A{A: containerIp})
+		dnsAppend(q, m, &dns.A{A: net.ParseIP(containerIp)})
 
-		//dnsAppend(q, m, &dns.AAAA{AAAA: container.NetworkSettings.Ipv6AddressesAsMultipleAnswerEntries})
+		//dnsAppend(q, m, &dns.AAAA{AAAA: net.ParseIP(container.NetworkSettings.Ipv6AddressesAsMultipleAnswerEntries)})
 		// TODO IPv6 support (when Docker itself has such a thing...)
 	}
 }
