@@ -1,1 +1,4 @@
 language: go
+
+# allow us to use Docker-based workers
+sudo: false
