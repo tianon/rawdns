@@ -97,9 +97,10 @@ func dnsAppend(q dns.Question, m *dns.Msg, rr dns.RR) {
 		hdr.Rrtype = dns.TypeTXT
 		rrS.Hdr = hdr
 	} else {
-		log.Printf("unknown RR type: %+v\n", rr)
+		log.Printf("error: unknown dnsAppend RR type: %+v\n", rr)
 		return
 	}
+
 	if q.Qtype == rr.Header().Rrtype {
 		m.Answer = append(m.Answer, rr)
 	} else {
@@ -116,7 +117,7 @@ func handleDockerRequest(domain string, w dns.ResponseWriter, r *dns.Msg) {
 	for _, q := range r.Question {
 		name := q.Name
 		if !strings.HasSuffix(name, domainSuffix) {
-			log.Printf("error: request for unknown domain %s (in %s)\n", name, domain)
+			log.Printf("error: request for unknown domain %q (in %q)\n", name, domain)
 			return
 		}
 		containerName := name[:len(name)-len(domainSuffix)]
@@ -132,13 +133,13 @@ func handleDockerRequest(domain string, w dns.ResponseWriter, r *dns.Msg) {
 			container, err = dockerInspectContainer(config[domain].Socket, linkedContainerName)
 		}
 		if err != nil {
-			log.Printf("error: failed to lookup container %s: %v\n", containerName, err)
+			log.Printf("error: failed to lookup container %q: %v\n", containerName, err)
 			return
 		}
 
 		containerIp := container.NetworkSettings.IpAddress
 		if containerIp == "" {
-			log.Printf("error: container %s is IP-less\n", containerName)
+			log.Printf("error: container %q is IP-less\n", containerName)
 			return
 		}
 
