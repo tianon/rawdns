@@ -15,13 +15,22 @@ import (
 type Config map[string]DomainConfig // { "docker.": { ... }, ".": { ... } }
 
 type DomainConfig struct {
-	Type string `json:"type"` // "containers" or "forwarding"
+	Type string `json:"type"` // "containers", "forwarding", "static"
 
 	// "type": "containers"
 	Socket string `json:"socket"` // "unix:///var/run/docker.sock"
 
 	// "type": "forwarding"
 	Nameservers []string `json:"nameservers"` // [ "8.8.8.8", "8.8.4.4" ]
+
+	// "type": "static"
+	Addrs  []string   `json:"addrs"`
+	Cnames []string   `json:"cnames"`
+	Txts   [][]string `json:"txts"`
+	// pre-calculated/parsed
+	addrs  []net.IP   // net.ParseIP(Addrs)
+	cnames []string   // dns.Fqdn(Cnames)
+	txts   [][]string // strings.Replace(Txts, `\`, `\\`, -1)
 }
 
 var config Config
@@ -53,6 +62,30 @@ func main() {
 			nameservers := config[domain].Nameservers
 			dns.HandleFunc(domain, func(w dns.ResponseWriter, r *dns.Msg) {
 				handleForwarding(nameservers, w, r)
+			})
+		case "static":
+			cCopy := config[domain]
+
+			cCopy.addrs = make([]net.IP, len(cCopy.Addrs))
+			for i, addr := range cCopy.Addrs {
+				cCopy.addrs[i] = net.ParseIP(addr)
+			}
+
+			cCopy.cnames = make([]string, len(cCopy.Cnames))
+			for i, cname := range cCopy.Cnames {
+				cCopy.cnames[i] = dns.Fqdn(cname)
+			}
+
+			cCopy.txts = make([][]string, len(cCopy.Txts))
+			for i, txts := range cCopy.Txts {
+				cCopy.txts[i] = make([]string, len(txts))
+				for j, txt := range txts {
+					cCopy.txts[i][j] = strings.Replace(txt, `\`, `\\`, -1)
+				}
+			}
+
+			dns.HandleFunc(domain, func(w dns.ResponseWriter, r *dns.Msg) {
+				handleStaticRequest(cCopy, w, r)
 			})
 		default:
 			log.Printf("error: unknown domain type on %s: %s\n", domain, config[domain].Type)
@@ -147,5 +180,30 @@ func handleDockerRequest(domain string, w dns.ResponseWriter, r *dns.Msg) {
 
 		//dnsAppend(q, m, &dns.AAAA{AAAA: net.ParseIP(container.NetworkSettings.Ipv6AddressesAsMultipleAnswerEntries)})
 		// TODO IPv6 support (when Docker itself has such a thing...)
+	}
+}
+
+func handleStaticRequest(config DomainConfig, w dns.ResponseWriter, r *dns.Msg) {
+	m := new(dns.Msg)
+	m.SetReply(r)
+	defer w.WriteMsg(m)
+
+	for _, q := range r.Question {
+		for _, addr := range config.addrs {
+			if addr.To4() != nil { // "If ip is not an IPv4 address, To4 returns nil."
+				dnsAppend(q, m, &dns.A{A: addr})
+			} else {
+				dnsAppend(q, m, &dns.AAAA{AAAA: addr})
+			}
+		}
+
+		for _, cname := range config.cnames {
+			dnsAppend(q, m, &dns.CNAME{Target: cname})
+			// TODO recursion?
+		}
+
+		for _, txt := range config.txts {
+			dnsAppend(q, m, &dns.TXT{Txt: txt})
+		}
 	}
 }
