@@ -134,7 +134,7 @@ func dnsAppend(q dns.Question, m *dns.Msg, rr dns.RR) {
 		return
 	}
 
-	if q.Qtype == rr.Header().Rrtype {
+	if q.Qtype == dns.TypeANY || q.Qtype == rr.Header().Rrtype {
 		m.Answer = append(m.Answer, rr)
 	} else {
 		m.Extra = append(m.Extra, rr)
