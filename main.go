@@ -88,7 +88,7 @@ func main() {
 				handleStaticRequest(cCopy, w, r)
 			})
 		default:
-			log.Printf("error: unknown domain type on %s: %s\n", domain, config[domain].Type)
+			log.Printf("error: unknown domain type on %s: %q\n", domain, config[domain].Type)
 			continue
 		}
 		log.Printf("listening on domain: %s\n", domain)
@@ -116,7 +116,8 @@ func serve(net, addr string) {
 }
 
 func dnsAppend(q dns.Question, m *dns.Msg, rr dns.RR) {
-	hdr := dns.RR_Header{Name: q.Name, Class: dns.ClassINET, Ttl: 0}
+	hdr := dns.RR_Header{Name: q.Name, Class: q.Qclass, Ttl: 0}
+
 	if rrS, ok := rr.(*dns.A); ok {
 		hdr.Rrtype = dns.TypeA
 		rrS.Hdr = hdr
