@@ -200,7 +200,24 @@ func handleStaticRequest(config DomainConfig, w dns.ResponseWriter, r *dns.Msg) 
 
 		for _, cname := range config.cnames {
 			dnsAppend(q, m, &dns.CNAME{Target: cname})
-			// TODO recursion?
+
+			if r.RecursionDesired && len(config.Nameservers) > 0 {
+				recR := &dns.Msg{
+					MsgHdr: dns.MsgHdr{
+						Id:               dns.Id(),
+					},
+					Question: []dns.Question{
+						{Name: cname, Qtype: q.Qtype, Qclass: q.Qclass},
+					},
+				}
+				recM := handleForwardingRaw(config.Nameservers, recR, w.RemoteAddr())
+				for _, rr := range recM.Answer {
+					dnsAppend(q, m, rr)
+				}
+				for _, rr := range recM.Extra {
+					dnsAppend(q, m, rr)
+				}
+			}
 		}
 
 		for _, txt := range config.txts {

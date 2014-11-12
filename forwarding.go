@@ -15,8 +15,7 @@ import (
 	"github.com/miekg/dns"
 )
 
-// ServeDNSForward forwards a request to a nameservers and returns the response.
-func handleForwarding(nameservers []string, w dns.ResponseWriter, req *dns.Msg) {
+func handleForwardingRaw(nameservers []string, req *dns.Msg, remote net.Addr) *dns.Msg {
 	if len(nameservers) == 0 {
 		log.Printf("no nameservers defined, can not forward\n")
 		m := new(dns.Msg)
@@ -24,11 +23,11 @@ func handleForwarding(nameservers []string, w dns.ResponseWriter, req *dns.Msg) 
 		m.SetRcode(req, dns.RcodeServerFailure)
 		m.Authoritative = false     // no matter what set to false
 		m.RecursionAvailable = true // and this is still true
-		w.WriteMsg(m)
-		return
+		return m
 	}
+
 	tcp := false
-	if _, ok := w.RemoteAddr().(*net.TCPAddr); ok {
+	if _, ok := remote.(*net.TCPAddr); ok {
 		tcp = true
 	}
 
@@ -51,8 +50,7 @@ Redo:
 	r, _, err = dnsClient.Exchange(req, nameserver)
 	if err == nil {
 		r.Compress = true
-		w.WriteMsg(r)
-		return
+		return r
 	}
 	// Seen an error, this can only mean, "server not reached", try again
 	// but only if we have not exausted our nameservers.
@@ -66,5 +64,10 @@ Redo:
 	m := new(dns.Msg)
 	m.SetReply(req)
 	m.SetRcode(req, dns.RcodeServerFailure)
-	w.WriteMsg(m)
+	return m
+}
+
+// ServeDNSForward forwards a request to a nameservers and returns the response.
+func handleForwarding(nameservers []string, w dns.ResponseWriter, req *dns.Msg) {
+	w.WriteMsg(handleForwardingRaw(nameservers, req, w.RemoteAddr()))
 }
