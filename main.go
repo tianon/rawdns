@@ -36,6 +36,8 @@ type DomainConfig struct {
 var config Config
 
 func main() {
+	log.Printf("rawdns v%s\n", VERSION)
+
 	configFile := "example-config.json"
 	if len(os.Args) > 1 {
 		configFile = os.Args[1]
