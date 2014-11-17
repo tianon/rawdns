@@ -37,7 +37,7 @@ type DomainConfig struct {
 var config Config
 
 func main() {
-	log.Printf("rawdns v%s (%s/%s)\n", VERSION, runtime.GOOS, runtime.GOARCH)
+	log.Printf("rawdns v%s (%s on %s/%s; %s)\n", VERSION, runtime.Version(), runtime.GOOS, runtime.GOARCH, runtime.Compiler)
 
 	configFile := "example-config.json"
 	if len(os.Args) > 1 {
