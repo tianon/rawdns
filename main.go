@@ -7,6 +7,7 @@ import (
 	"net"
 	"os"
 	"os/signal"
+	"runtime"
 	"strings"
 
 	"github.com/miekg/dns"
@@ -36,7 +37,7 @@ type DomainConfig struct {
 var config Config
 
 func main() {
-	log.Printf("rawdns v%s\n", VERSION)
+	log.Printf("rawdns v%s (%s/%s)\n", VERSION, runtime.GOOS, runtime.GOARCH)
 
 	configFile := "example-config.json"
 	if len(os.Args) > 1 {
