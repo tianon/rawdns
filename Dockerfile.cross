@@ -10,8 +10,9 @@ ENV BUILD_FLAGS -v -ldflags -d -tags netgo -a
 COPY *.go /go/src/github.com/tianon/rawdns/
 WORKDIR /go/src/github.com/tianon/rawdns
 
+# rawdns-$(dpkg --print-architecture)
 RUN GOARCH=amd64       go build $BUILD_FLAGS -o /go/bin/rawdns-amd64
-RUN GOARCH=386         go build $BUILD_FLAGS -o /go/bin/rawdns-386
-RUN GOARCH=arm GOARM=5 go build $BUILD_FLAGS -o /go/bin/rawdns-armv5
-RUN GOARCH=arm GOARM=6 go build $BUILD_FLAGS -o /go/bin/rawdns-armv6
-RUN GOARCH=arm GOARM=7 go build $BUILD_FLAGS -o /go/bin/rawdns-armv7
+RUN GOARCH=386         go build $BUILD_FLAGS -o /go/bin/rawdns-i386
+RUN GOARCH=arm GOARM=5 go build $BUILD_FLAGS -o /go/bin/rawdns-armel
+RUN GOARCH=arm GOARM=6 go build $BUILD_FLAGS -o /go/bin/rawdns-armhf
+#RUN GOARCH=arm GOARM=7 go build $BUILD_FLAGS -o /go/bin/rawdns-armhf # boo Raspberry Pi, making life hard
