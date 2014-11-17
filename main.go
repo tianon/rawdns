@@ -207,7 +207,7 @@ func handleStaticRequest(config DomainConfig, w dns.ResponseWriter, r *dns.Msg) 
 			if r.RecursionDesired && len(config.Nameservers) > 0 {
 				recR := &dns.Msg{
 					MsgHdr: dns.MsgHdr{
-						Id:               dns.Id(),
+						Id: dns.Id(),
 					},
 					Question: []dns.Question{
 						{Name: cname, Qtype: q.Qtype, Qclass: q.Qclass},
