@@ -1,4 +1,4 @@
-package main
+package main // import "github.com/tianon/rawdns"
 
 import (
 	"encoding/json"
