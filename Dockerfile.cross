@@ -1,14 +1,14 @@
-FROM golang:1.3-cross
+FROM golang:1.4-cross
 
 # disable CGO for ALL THE THINGS (to help ensure no libc)
 ENV CGO_ENABLED 0
 
 RUN go get -d -v github.com/miekg/dns
 
-ENV BUILD_FLAGS -v -ldflags -d -tags netgo -a
+ENV BUILD_FLAGS -v -ldflags -d -a -tags netgo -installsuffix netgo
 
-COPY *.go /go/src/github.com/tianon/rawdns/
 WORKDIR /go/src/github.com/tianon/rawdns
+COPY *.go /go/src/github.com/tianon/rawdns/
 
 # rawdns-$(dpkg --print-architecture)
 RUN GOARCH=amd64       go build $BUILD_FLAGS -o /go/bin/rawdns-amd64
