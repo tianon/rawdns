@@ -1,5 +1,15 @@
 language: go
 go: 1.4
 
-# allow us to use Docker-based workers
-sudo: false
+env:
+    - GIMME_ARCH=amd64
+    - GIMME_ARCH=386
+    - GIMME_ARCH=arm GOARM=5
+    - GIMME_ARCH=arm GOARM=6
+    - GIMME_ARCH=arm GOARM=7
+
+install:
+    - export GOPATH="$GOPATH:$PWD/vendor"
+
+script:
+    - go build -v ./...
