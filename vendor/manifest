@@ -1,0 +1,11 @@
+{
+	"version": 0,
+	"dependencies": [
+		{
+			"importpath": "github.com/miekg/dns",
+			"repository": "https://github.com/miekg/dns",
+			"revision": "7864d445e5087e8d761dbefec43f29b92f7650eb",
+			"branch": "master"
+		}
+	]
+}

@@ -3,13 +3,12 @@ FROM golang:1.4-cross
 # disable CGO for ALL THE THINGS (to help ensure no libc)
 ENV CGO_ENABLED 0
 
-RUN go get -d -v github.com/miekg/dns
-
 ENV BUILD_FLAGS -v -ldflags -d -a -tags netgo -installsuffix netgo
 
-WORKDIR /go/src/github.com/tianon/rawdns
-COPY *.go /go/src/github.com/tianon/rawdns/
+ENV GOPATH $GOPATH:/go/src/github.com/tianon/rawdns/vendor
+COPY . /go/src/github.com/tianon/rawdns
 
+WORKDIR /go/src/github.com/tianon/rawdns/src/cmd/rawdns
 # rawdns-$(dpkg --print-architecture)
 RUN GOARCH=amd64       go build $BUILD_FLAGS -o /go/bin/rawdns-amd64
 RUN GOARCH=386         go build $BUILD_FLAGS -o /go/bin/rawdns-i386
