@@ -28,7 +28,7 @@ func dockerInspectContainer(dockerHost, containerName string) (*dockerContainer,
 		return nil, fmt.Errorf("failed parsing URL '%s': %v", dockerHost, err)
 	}
 	client := httpClient(u)
-	req, err := http.NewRequest("GET", u.String()+"/v1.10/containers/"+containerName+"/json", nil)
+	req, err := http.NewRequest("GET", u.String()+"/v1.14/containers/"+containerName+"/json", nil)
 	if err != nil {
 		return nil, fmt.Errorf("failed creating request: %v", err)
 	}
