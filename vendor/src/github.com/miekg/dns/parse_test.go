@@ -1477,3 +1477,51 @@ func TestParseCAA(t *testing.T) {
 		}
 	}
 }
+
+func TestPackCAA(t *testing.T) {
+	m := new(Msg)
+	record := new(CAA)
+	record.Hdr = RR_Header{Name: "example.com.", Rrtype: TypeCAA, Class: ClassINET, Ttl: 0}
+	record.Tag = "issue"
+	record.Value = "symantec.com"
+	record.Flag = 1
+
+	m.Answer = append(m.Answer, record)
+	bytes, err := m.Pack()
+	if err != nil {
+		t.Fatalf("failed to pack msg: %v", err)
+	}
+	if err := m.Unpack(bytes); err != nil {
+		t.Fatalf("failed to unpack msg: %v", err)
+	}
+	if len(m.Answer) != 1 {
+		t.Fatalf("incorrect number of answers unpacked")
+	}
+	rr := m.Answer[0].(*CAA)
+	if rr.Tag != "issue" {
+		t.Fatalf("invalid tag for unpacked answer")
+	} else if rr.Value != "symantec.com" {
+		t.Fatalf("invalid value for unpacked answer")
+	} else if rr.Flag != 1 {
+		t.Fatalf("invalid flag for unpacked answer")
+	}
+}
+
+func TestParseURI(t *testing.T) {
+	lt := map[string]string{
+		"_http._tcp. IN URI   10 1 \"http://www.example.com/path\"": "_http._tcp.\t3600\tIN\tURI\t10 1 \"http://www.example.com/path\"",
+		"_http._tcp. IN URI   10 1 \"\"": "_http._tcp.\t3600\tIN\tURI\t10 1 \"\"",
+	}
+	for i, o := range lt {
+		rr, err := NewRR(i)
+		if err != nil {
+			t.Error("failed to parse RR: ", err)
+			continue
+		}
+		if rr.String() != o {
+			t.Errorf("`%s' should be equal to\n`%s', but is     `%s'", i, o, rr.String())
+		} else {
+			t.Logf("RR is OK: `%s'", rr.String())
+		}
+	}
+}
