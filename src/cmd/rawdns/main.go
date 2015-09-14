@@ -1,7 +1,10 @@
 package main // import "github.com/tianon/rawdns/src/cmd/rawdns"
 
 import (
+	"crypto/tls"
+	"crypto/x509"
 	"encoding/json"
+	"fmt"
 	"io/ioutil"
 	"log"
 	"net"
@@ -20,6 +23,15 @@ type DomainConfig struct {
 
 	// "type": "containers"
 	Socket string `json:"socket"` // "unix:///var/run/docker.sock"
+
+	// TLS cert/key paths are used to construct the tls.Config
+	TLSVerify bool   `json:"tlsverify"`
+	TLSCACert string `json:"tlscacert"`
+	TLSCert   string `json:"tlscert"`
+	TLSKey    string `json:"tlskey"`
+
+	// IP address strategy
+	SwarmNode bool `json:"swarmnode"`
 
 	// "type": "forwarding"
 	Nameservers []string `json:"nameservers"` // [ "8.8.8.8", "8.8.4.4" ]
@@ -43,6 +55,7 @@ func main() {
 	if len(os.Args) > 1 {
 		configFile = os.Args[1]
 	}
+
 	configData, err := ioutil.ReadFile(configFile)
 	if err != nil {
 		log.Fatalf("error: unable to read config file %s: %v\n", configFile, err)
@@ -56,9 +69,18 @@ func main() {
 		switch config[domain].Type {
 		case "containers":
 			// TODO there must be a better way to pass "domain" along without an anonymous function AND copied variable
+			var tlsConfig *tls.Config
+			if config[domain].TLSCert != "" && config[domain].TLSKey != "" {
+				var err error
+				tlsConfig, err = loadTLSConfig(config[domain].TLSCACert, config[domain].TLSCert, config[domain].TLSKey, config[domain].TLSVerify)
+				if err != nil {
+					log.Fatalf("error: Unable to load tls config for %s: %s\n", domain, err)
+				}
+			}
+
 			dCopy := domain
 			dns.HandleFunc(dCopy, func(w dns.ResponseWriter, r *dns.Msg) {
-				handleDockerRequest(dCopy, w, r)
+				handleDockerRequest(dCopy, tlsConfig, w, r)
 			})
 		case "forwarding":
 			// TODO there must be a better way to pass "domain" along without an anonymous function AND copied variable
@@ -145,7 +167,7 @@ func dnsAppend(q dns.Question, m *dns.Msg, rr dns.RR) {
 	}
 }
 
-func handleDockerRequest(domain string, w dns.ResponseWriter, r *dns.Msg) {
+func handleDockerRequest(domain string, tlsConfig *tls.Config, w dns.ResponseWriter, r *dns.Msg) {
 	m := new(dns.Msg)
 	m.SetReply(r)
 	defer w.WriteMsg(m)
@@ -159,7 +181,7 @@ func handleDockerRequest(domain string, w dns.ResponseWriter, r *dns.Msg) {
 		}
 		containerName := name[:len(name)-len(domainSuffix)]
 
-		container, err := dockerInspectContainer(config[domain].Socket, containerName)
+		container, err := dockerInspectContainer(config[domain].Socket, containerName, tlsConfig)
 		if err != nil && strings.Contains(containerName, ".") {
 			// we have something like "db.app", so let's try looking up a "app/db" container (linking!)
 			parts := strings.Split(containerName, ".")
@@ -167,14 +189,20 @@ func handleDockerRequest(domain string, w dns.ResponseWriter, r *dns.Msg) {
 			for i := range parts {
 				linkedContainerName += "/" + parts[len(parts)-i-1]
 			}
-			container, err = dockerInspectContainer(config[domain].Socket, linkedContainerName)
+			container, err = dockerInspectContainer(config[domain].Socket, linkedContainerName, tlsConfig)
 		}
 		if err != nil {
 			log.Printf("error: failed to lookup container %q: %v\n", containerName, err)
 			return
 		}
 
-		containerIp := container.NetworkSettings.IpAddress
+		var containerIp string
+		if config[domain].SwarmNode {
+			containerIp = container.Node.IP
+		} else {
+			containerIp = container.NetworkSettings.IpAddress
+		}
+
 		if containerIp == "" {
 			log.Printf("error: container %q is IP-less\n", containerName)
 			return
@@ -227,4 +255,35 @@ func handleStaticRequest(config DomainConfig, w dns.ResponseWriter, r *dns.Msg) 
 			dnsAppend(q, m, &dns.TXT{Txt: txt})
 		}
 	}
+}
+
+// Load the TLS certificates/keys and, if verify is true, the CA.
+func loadTLSConfig(ca, cert, key string, verify bool) (*tls.Config, error) {
+	c, err := tls.LoadX509KeyPair(cert, key)
+	if err != nil {
+		return nil, fmt.Errorf("Couldn't load X509 key pair (%s, %s): %s. Key encrypted?",
+			cert, key, err)
+	}
+
+	config := &tls.Config{
+		Certificates: []tls.Certificate{c},
+		MinVersion:   tls.VersionTLS10,
+	}
+
+	if verify {
+		certPool := x509.NewCertPool()
+		file, err := ioutil.ReadFile(ca)
+		if err != nil {
+			return nil, fmt.Errorf("Couldn't read CA certificate: %s", err)
+		}
+		certPool.AppendCertsFromPEM(file)
+		config.RootCAs = certPool
+		config.ClientAuth = tls.RequireAndVerifyClientCert
+		config.ClientCAs = certPool
+	} else {
+		// If --tlsverify is not supplied, disable CA validation.
+		config.InsecureSkipVerify = true
+	}
+
+	return config, nil
 }

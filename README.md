@@ -82,3 +82,68 @@ PING dns.docker (172.18.0.30) 56(84) bytes of data.
 3 packets transmitted, 3 received, 0% packet loss, time 2001ms
 rtt min/avg/max/mdev = 0.025/0.038/0.049/0.011 ms
 ```
+
+## swarm support
+
+`rawdns` can be used with swarm by creating a configuration that provides the socket details using the `tcp://` scheme.  You will also need to enable `swarmnode` by setting it to true.  The `swarmnode` option enables `rawdns` to look at the `Node` section of the inspect API response for the external/host IP address.
+
+Example swarm configuration:
+
+```json
+{
+    "swarm.": {
+        "type": "containers",
+        "socket": "tcp://192.168.99.100:3376",
+        "swarmnode": true,
+        "tlsverify": true,
+        "tlscacert": "/var/lib/boot2docker/ca.pem",
+        "tlscert": "/var/lib/boot2docker/server.pem",
+        "tlskey": "/var/lib/boot2docker/server-key.pem"
+    },
+    "docker.": {
+        "type": "containers",
+        "socket": "unix:///var/run/docker.sock"
+    },
+    "local.": {
+        "type": "forwarding",
+        "nameservers": [ "172.17.42.1" ]
+    },
+    ".": {
+        "type": "forwarding",
+        "nameservers": [ "8.8.8.8", "8.8.4.4" ]
+    }
+}
+```
+
+Example usage:
+
+```shell
+$ docker run --name dns --rm -it \
+    -p 53:53/udp \
+    -v /var/run/docker.sock:/var/run/docker.sock \
+    -v /var/lib/boot2docker:/var/lib/boot2docker \
+    -v /etc/rawdns.json:/etc/rawdns.json:ro \
+    tombee/rawdns rawdns /etc/rawdns.json
+
+2015/09/14 21:50:49 rawdns v1.2 (go1.4.2 on linux/amd64; gc)
+2015/09/14 21:50:49 listening on domain: .
+2015/09/14 21:50:49 listening on domain: swarm.
+2015/09/14 21:50:49 listening on domain: docker.
+2015/09/14 21:50:49 listening on domain: local.
+
+...
+
+$ docker run -it debian:jessie bash
+
+root@69967c3e5179:/# ping redis.swarm
+PING redis.swarm (192.168.99.101): 56 data bytes
+64 bytes from 192.168.99.101: icmp_seq=0 ttl=63 time=0.001 ms
+
+root@69967c3e5179:/# ping dns.swarm
+PING dns.swarm (192.168.99.100): 56 data bytes
+64 bytes from 192.168.99.100: icmp_seq=0 ttl=64 time=0.030 ms
+
+root@69967c3e5179:/# ping dns.docker
+PING dns.docker (172.17.0.85): 56 data bytes
+64 bytes from 172.17.0.85: icmp_seq=0 ttl=64 time=0.076 ms
+```
