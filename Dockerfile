@@ -1,15 +1,12 @@
 FROM golang:1.5
 
-# get a specific commit of "gb" for repeatability
-ENV GB_COMMIT e677e206028e1d4e3a8ec2e6e4ca5caa0c94f8fd
+ENV GB_VERSION v0.1.2
 RUN set -x \
-	&& git clone https://github.com/constabulary/gb.git /go/src/github.com/constabulary/gb \
-	&& ( \
-		cd /go/src/github.com/constabulary/gb \
-		&& git checkout --quiet $GB_COMMIT \
-		&& go install -v ./... \
-	) \
-	&& rm -rf /go/src/github.com/constabulary/gb
+	&& mkdir -p /go/src/github.com/constabulary/gb \
+	&& cd /go/src/github.com/constabulary/gb \
+	&& curl -fsSL 'https://github.com/constabulary/gb/archive/v0.1.2.tar.gz' \
+		| tar -xz --strip-components=1 \
+	&& go install -v ./...
 
 WORKDIR /usr/src/rawdns
 ENV PATH $PATH:/usr/src/rawdns/bin
