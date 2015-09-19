@@ -1,4 +1,4 @@
-FROM golang:1.4
+FROM golang:1.5
 
 # get a specific commit of "gb" for repeatability
 ENV GB_COMMIT e677e206028e1d4e3a8ec2e6e4ca5caa0c94f8fd
