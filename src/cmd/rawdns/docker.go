@@ -50,6 +50,7 @@ func dockerInspectContainer(dockerHost, containerName string) (*dockerContainer,
 
 func httpClient(u *url.URL) *http.Client {
 	transport := &http.Transport{}
+	transport.DisableKeepAlives = true
 	switch u.Scheme {
 	case "tcp":
 		u.Scheme = "http"
