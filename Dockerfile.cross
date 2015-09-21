@@ -1,4 +1,4 @@
-FROM golang:1.4-cross
+FROM golang:1.5
 
 # disable CGO for ALL THE THINGS (to help ensure no libc)
 ENV CGO_ENABLED 0
