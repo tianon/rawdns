@@ -1,6 +1,7 @@
 package main
 
 import (
+	"crypto/tls"
 	"encoding/json"
 	"fmt"
 	"net"
@@ -20,14 +21,18 @@ type dockerContainer struct {
 		MacAddress  string
 		// TODO Ports ?
 	}
+
+	Node struct {
+		IP string
+	}
 }
 
-func dockerInspectContainer(dockerHost, containerName string) (*dockerContainer, error) {
+func dockerInspectContainer(dockerHost, containerName string, tlsConfig *tls.Config) (*dockerContainer, error) {
 	u, err := url.Parse(dockerHost)
 	if err != nil {
 		return nil, fmt.Errorf("failed parsing URL '%s': %v", dockerHost, err)
 	}
-	client := httpClient(u)
+	client := httpClient(u, tlsConfig)
 	req, err := http.NewRequest("GET", u.String()+"/v1.14/containers/"+containerName+"/json", nil)
 	if err != nil {
 		return nil, fmt.Errorf("failed creating request: %v", err)
@@ -48,12 +53,17 @@ func dockerInspectContainer(dockerHost, containerName string) (*dockerContainer,
 	return &ret, nil
 }
 
-func httpClient(u *url.URL) *http.Client {
+func httpClient(u *url.URL, tlsConfig *tls.Config) *http.Client {
 	transport := &http.Transport{}
 	transport.DisableKeepAlives = true
 	switch u.Scheme {
 	case "tcp":
-		u.Scheme = "http"
+		if tlsConfig != nil {
+			u.Scheme = "https"
+			transport.TLSClientConfig = tlsConfig
+		} else {
+			u.Scheme = "http"
+		}
 	case "unix":
 		path := u.Path
 		transport.Dial = func(proto, addr string) (net.Conn, error) {
