@@ -88,7 +88,6 @@ func TestClientEDNS0(t *testing.T) {
 
 // Validates the transmission and parsing of local EDNS0 options.
 func TestClientEDNS0Local(t *testing.T) {
-
 	optStr1 := "1979:0x0707"
 	optStr2 := strconv.Itoa(EDNS0LOCALSTART) + ":0x0601"
 
@@ -149,62 +148,16 @@ func TestClientEDNS0Local(t *testing.T) {
 	// Validate the local options in the reply.
 	got := r.Extra[1].(*OPT).Option[0].(*EDNS0_LOCAL).String()
 	if got != optStr1 {
-		t.Log("failed to get local edns0 answer; got %s, expected %s", got, optStr1)
+		t.Logf("failed to get local edns0 answer; got %s, expected %s", got, optStr1)
 		t.Fail()
 		t.Logf("%v\n", r)
 	}
 
 	got = r.Extra[1].(*OPT).Option[1].(*EDNS0_LOCAL).String()
 	if got != optStr2 {
-		t.Log("failed to get local edns0 answer; got %s, expected %s", got, optStr2)
+		t.Logf("failed to get local edns0 answer; got %s, expected %s", got, optStr2)
 		t.Fail()
 		t.Logf("%v\n", r)
-	}
-}
-
-func TestSingleSingleInflight(t *testing.T) {
-	HandleFunc("miek.nl.", HelloServer)
-	defer HandleRemove("miek.nl.")
-
-	s, addrstr, err := RunLocalUDPServer("127.0.0.1:0")
-	if err != nil {
-		t.Fatalf("Unable to run test server: %v", err)
-	}
-	defer s.Shutdown()
-
-	m := new(Msg)
-	m.SetQuestion("miek.nl.", TypeDNSKEY)
-
-	c := new(Client)
-	c.SingleInflight = true
-	nr := 10
-	ch := make(chan time.Duration)
-	for i := 0; i < nr; i++ {
-		go func() {
-			_, rtt, _ := c.Exchange(m, addrstr)
-			ch <- rtt
-		}()
-	}
-	i := 0
-	var first time.Duration
-	// With inflight *all* rtt are identical, and by doing actual lookups
-	// the changes that this is a coincidence is small.
-Loop:
-	for {
-		select {
-		case rtt := <-ch:
-			if i == 0 {
-				first = rtt
-			} else {
-				if first != rtt {
-					t.Errorf("all rtts should be equal.  got %d want %d", rtt, first)
-				}
-			}
-			i++
-			if i == 10 {
-				break Loop
-			}
-		}
 	}
 }
 
@@ -282,5 +235,4 @@ func TestClientConn(t *testing.T) {
 	if err = r.Unpack(buf); err != nil {
 		t.Errorf("unable to unpack message fully: %v", err)
 	}
-
 }
