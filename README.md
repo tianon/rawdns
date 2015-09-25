@@ -123,7 +123,7 @@ $ docker run --name dns --rm -it \
     -v /var/run/docker.sock:/var/run/docker.sock \
     -v /var/lib/boot2docker:/var/lib/boot2docker \
     -v /etc/rawdns.json:/etc/rawdns.json:ro \
-    tombee/rawdns rawdns /etc/rawdns.json
+    tianon/rawdns rawdns /etc/rawdns.json
 
 2015/09/14 21:50:49 rawdns v1.2 (go1.4.2 on linux/amd64; gc)
 2015/09/14 21:50:49 listening on domain: .
