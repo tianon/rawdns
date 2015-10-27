@@ -1,10 +1,10 @@
 FROM golang:1.5
 
-ENV GB_VERSION v0.1.2
+ENV GB_VERSION 0.2.0
 RUN set -x \
 	&& mkdir -p /go/src/github.com/constabulary/gb \
 	&& cd /go/src/github.com/constabulary/gb \
-	&& curl -fsSL 'https://github.com/constabulary/gb/archive/v0.1.2.tar.gz' \
+	&& curl -fsSL "https://github.com/constabulary/gb/archive/v${GB_VERSION}.tar.gz" \
 		| tar -xz --strip-components=1 \
 	&& go install -v ./...
 
