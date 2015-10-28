@@ -12,7 +12,8 @@ env:
     - GIMME_ARCH=arm GOARM=7
 
 install:
-    - export GOPATH="$GOPATH:$PWD/vendor"
+    - export GOPATH="$PWD/src:$PWD/vendor"
+    - cd src
 
 script:
     - go build -v ./...
