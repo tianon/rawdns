@@ -1,4 +1,8 @@
+*.md
 .git
+.travis.yml
+Dockerfile*
+LICENSE
 bin
 build-cross.sh
 config-*
