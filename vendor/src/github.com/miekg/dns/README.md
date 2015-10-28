@@ -43,6 +43,7 @@ A not-so-up-to-date-list-that-may-be-actually-current:
 * https://github.com/fcambus/statzone
 * https://github.com/benschw/dns-clb-go
 * https://github.com/corny/dnscheck for http://public-dns.tk/
+* https://namesmith.io
 
 Send pull request if you want to be listed here.
 
@@ -124,6 +125,7 @@ Example programs can be found in the `github.com/miekg/exdns` repository.
 * 6605 - ECDSA
 * 6725 - IANA Registry Update
 * 6742 - ILNP DNS
+* 6840 - Clarifications and Implementation Notes for DNS Security
 * 6844 - CAA record
 * 6891 - EDNS0 update
 * 6895 - DNS IANA considerations
