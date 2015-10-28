@@ -18,4 +18,3 @@ RUN GOARCH=arm GOARM=6 go build $BUILD_FLAGS -o /go/bin/rawdns-armhf
 RUN GOARCH=arm64       go build $BUILD_FLAGS -o /go/bin/rawdns-arm64
 RUN GOARCH=ppc64       go build $BUILD_FLAGS -o /go/bin/rawdns-ppc64
 RUN GOARCH=ppc64le     go build $BUILD_FLAGS -o /go/bin/rawdns-ppc64el
-RUN file /go/bin/rawdns-*
