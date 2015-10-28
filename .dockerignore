@@ -1,5 +1,6 @@
 .git
 bin
+build-cross.sh
 config-*
 pkg
 rawdns*
