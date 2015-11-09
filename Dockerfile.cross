@@ -7,8 +7,8 @@ ENV BUILD_FLAGS -v -ldflags -d -a -tags netgo -installsuffix netgo
 
 ENV GOPATH $GOPATH:/go/src/github.com/tianon/rawdns/vendor
 COPY . /go/src/github.com/tianon/rawdns
-
 WORKDIR /go/src/github.com/tianon/rawdns/src/cmd/rawdns
+
 # rawdns-$(dpkg --print-architecture)
 RUN GOARCH=386         go build $BUILD_FLAGS -o /go/bin/rawdns-i386
 RUN GOARCH=amd64       go build $BUILD_FLAGS -o /go/bin/rawdns-amd64
