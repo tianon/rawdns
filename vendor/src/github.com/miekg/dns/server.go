@@ -434,7 +434,10 @@ func (srv *Server) serveTCP(l *net.TCPListener) error {
 	for {
 		rw, e := l.AcceptTCP()
 		if e != nil {
-			continue
+			if neterr, ok := e.(net.Error); ok && neterr.Temporary() {
+				continue
+			}
+			return e
 		}
 		m, e := reader.ReadTCP(rw, rtimeout)
 		srv.lock.RLock()
@@ -532,6 +535,9 @@ Redo:
 	h.ServeDNS(w, req) // Writes back to the client
 
 Exit:
+	if w.tcp == nil {
+		return
+	}
 	// TODO(miek): make this number configurable?
 	if q > maxTCPQueries { // close socket after this many queries
 		w.Close()
