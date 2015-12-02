@@ -1,6 +1,6 @@
 FROM golang:1.5
 
-ENV GB_VERSION 0.3.2
+ENV GB_VERSION 0.3.3
 RUN set -x \
 	&& mkdir -p /go/src/github.com/constabulary/gb \
 	&& cd /go/src/github.com/constabulary/gb \
