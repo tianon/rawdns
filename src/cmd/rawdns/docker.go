@@ -33,7 +33,7 @@ func dockerInspectContainer(dockerHost, containerName string, tlsConfig *tls.Con
 		return nil, fmt.Errorf("failed parsing URL '%s': %v", dockerHost, err)
 	}
 	client := httpClient(u, tlsConfig)
-	req, err := http.NewRequest("GET", u.String()+"/v1.14/containers/"+containerName+"/json", nil)
+	req, err := http.NewRequest("GET", u.String()+"/v1.16/containers/"+containerName+"/json", nil)
 	if err != nil {
 		return nil, fmt.Errorf("failed creating request: %v", err)
 	}
