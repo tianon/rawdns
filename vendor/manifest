@@ -4,7 +4,7 @@
 		{
 			"importpath": "github.com/miekg/dns",
 			"repository": "https://github.com/miekg/dns",
-			"revision": "f520760857195d2fd32def6f108270857522500a",
+			"revision": "85b661b2a6fc95a5a83e66d7730c4bc0b6e9c99e",
 			"branch": "master"
 		}
 	]
