@@ -1,6 +1,6 @@
 # ![rawdns](https://raw.githubusercontent.com/tianon/rawdns/master/logo-black.png)
 
-- [Docker Hub](https://registry.hub.docker.com/u/tianon/rawdns/)
+- [Docker Hub](https://index.docker.io/u/tianon/rawdns/)
 - [GitHub](https://github.com/tianon/rawdns)
 - [![Build Status](https://travis-ci.org/tianon/rawdns.svg)](https://travis-ci.org/tianon/rawdns)
 
