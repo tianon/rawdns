@@ -1,4 +1,4 @@
-# rawdns
+# ![rawdns](https://raw.githubusercontent.com/tianon/rawdns/master/logo-black.png)
 
 - [Docker Hub](https://registry.hub.docker.com/u/tianon/rawdns/)
 - [GitHub](https://github.com/tianon/rawdns)
