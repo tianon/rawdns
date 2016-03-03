@@ -196,22 +196,31 @@ func handleDockerRequest(domain string, tlsConfig *tls.Config, w dns.ResponseWri
 			return
 		}
 
-		var containerIp string
+		var containerIp, containerIp6 string
 		if config[domain].SwarmNode {
-			containerIp = container.Node.IP
+			nodeIp := net.ParseIP(container.Node.IP)
+			if nodeIp.To4() != nil {
+				containerIp = container.Node.IP
+			} else {
+				containerIp6 = container.Node.IP
+			}
 		} else {
 			containerIp = container.NetworkSettings.IpAddress
+			containerIp6 = container.NetworkSettings.Ip6Address
 		}
 
-		if containerIp == "" {
+		if containerIp == "" && containerIp6 == "" {
 			log.Printf("error: container %q is IP-less\n", containerName)
 			return
 		}
 
-		dnsAppend(q, m, &dns.A{A: net.ParseIP(containerIp)})
+		if containerIp != "" {
+			dnsAppend(q, m, &dns.A{A: net.ParseIP(containerIp)})
+		}
 
-		//dnsAppend(q, m, &dns.AAAA{AAAA: net.ParseIP(container.NetworkSettings.Ipv6AddressesAsMultipleAnswerEntries)})
-		// TODO IPv6 support (when Docker itself has such a thing...)
+		if containerIp6 != "" {
+			dnsAppend(q, m, &dns.AAAA{AAAA: net.ParseIP(containerIp6)})
+		}
 	}
 }
 

@@ -23,6 +23,10 @@ type dockerContainer struct {
 		IpAddress   string `json:"IPAddress"`
 		IpPrefixLen int    `json:"IPPrefixLen"`
 
+		Ip6Gateway   string `json:"IPv6Gateway"`
+		Ip6Address   string `json:"GlobalIPv6Address"`
+		Ip6PrefixLen string `json:"GlobalIPv6PrefixLen"`
+
 		// TODO Ports ?
 	}
 
