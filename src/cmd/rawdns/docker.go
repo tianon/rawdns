@@ -16,11 +16,13 @@ type dockerContainer struct {
 	Name string
 
 	NetworkSettings struct {
-		Bridge      string
+		Bridge     string
+		MacAddress string
+
 		Gateway     string
 		IpAddress   string `json:"IPAddress"`
 		IpPrefixLen int    `json:"IPPrefixLen"`
-		MacAddress  string
+
 		// TODO Ports ?
 	}
 
