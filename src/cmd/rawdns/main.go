@@ -181,7 +181,7 @@ func handleDockerRequest(domain string, tlsConfig *tls.Config, w dns.ResponseWri
 		}
 		containerName := name[:len(name)-len(domainSuffix)]
 
-		container, err := dockerInspectContainer(config[domain].Socket, containerName, tlsConfig)
+		ips, err := dockerGetIpList(config[domain].Socket, containerName, tlsConfig, config[domain].SwarmNode)
 		if err != nil && strings.Contains(containerName, ".") {
 			// we have something like "db.app", so let's try looking up a "app/db" container (linking!)
 			parts := strings.Split(containerName, ".")
@@ -189,37 +189,24 @@ func handleDockerRequest(domain string, tlsConfig *tls.Config, w dns.ResponseWri
 			for i := range parts {
 				linkedContainerName += "/" + parts[len(parts)-i-1]
 			}
-			container, err = dockerInspectContainer(config[domain].Socket, linkedContainerName, tlsConfig)
+			ips, err = dockerGetIpList(config[domain].Socket, linkedContainerName, tlsConfig, config[domain].SwarmNode)
 		}
 		if err != nil {
 			log.Printf("error: failed to lookup container %q: %v\n", containerName, err)
 			return
 		}
 
-		var containerIp, containerIp6 string
-		if config[domain].SwarmNode {
-			nodeIp := net.ParseIP(container.Node.IP)
-			if nodeIp.To4() != nil {
-				containerIp = container.Node.IP
-			} else {
-				containerIp6 = container.Node.IP
-			}
-		} else {
-			containerIp = container.NetworkSettings.IpAddress
-			containerIp6 = container.NetworkSettings.Ip6Address
-		}
-
-		if containerIp == "" && containerIp6 == "" {
+		if len(ips) == 0 {
 			log.Printf("error: container %q is IP-less\n", containerName)
 			return
 		}
 
-		if containerIp != "" {
-			dnsAppend(q, m, &dns.A{A: net.ParseIP(containerIp)})
-		}
-
-		if containerIp6 != "" {
-			dnsAppend(q, m, &dns.AAAA{AAAA: net.ParseIP(containerIp6)})
+		for _, ip := range ips {
+			if ip4 := ip.To4(); ip4 != nil {
+				dnsAppend(q, m, &dns.A{A: ip4})
+			} else {
+				dnsAppend(q, m, &dns.AAAA{AAAA: ip})
+			}
 		}
 	}
 }
