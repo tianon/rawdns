@@ -1,8 +1,8 @@
-FROM golang:1.5-alpine
+FROM golang:1.6-alpine
 
 RUN apk add --no-cache ca-certificates openssl
 
-ENV GB_VERSION 0.3.5
+ENV GB_VERSION 0.4.2
 RUN set -x \
 	&& mkdir -p /go/src/github.com/constabulary \
 	&& cd /go/src/github.com/constabulary \
