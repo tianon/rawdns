@@ -16,6 +16,6 @@ WORKDIR /usr/src/rawdns
 ENV PATH $PATH:/usr/src/rawdns/bin
 
 COPY . /usr/src/rawdns
-RUN gb build
+RUN gb build -ldflags '-s -w'
 
 CMD ["rawdns"]
