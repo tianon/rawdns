@@ -13,9 +13,9 @@ RUN set -x \
 	&& go install -v ./...
 
 WORKDIR /usr/src/rawdns
-ENV PATH $PATH:/usr/src/rawdns/bin
+ENV PATH /usr/src/rawdns/bin:$PATH
 
-COPY . /usr/src/rawdns
+COPY . .
 RUN gb build -ldflags '-s -w'
 
 CMD ["rawdns"]
