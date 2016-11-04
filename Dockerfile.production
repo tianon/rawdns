@@ -1,0 +1,32 @@
+FROM alpine:3.4
+
+WORKDIR /etc/rawdns
+
+ENV RAWDNS_VERSION 1.4
+
+RUN set -ex; \
+	\
+	apk add --no-cache --virtual .fetch-deps \
+		ca-certificates \
+		dpkg \
+#		gnupg \
+		openssl \
+	; \
+	\
+	dpkgArch="$(dpkg --print-architecture | awk -F- '{ print $NF }')"; \
+	wget -O /usr/local/bin/rawdns "https://github.com/tianon/rawdns/releases/download/$RAWDNS_VERSION/rawdns-$dpkgArch"; \
+#	wget -O /usr/local/bin/rawdns.asc "https://github.com/tianon/rawdns/releases/download/$RAWDNS_VERSION/rawdns-$dpkgArch.asc"; \
+	\
+#	export GNUPGHOME="$(mktemp -d)"; \
+## gpg: key BF357DD4: public key "Tianon Gravi <tianon@tianon.xyz>" imported
+#	gpg --keyserver ha.pool.sks-keyservers.net --recv-keys B42F6819007F00F88E364FD4036A9C25BF357DD4; \
+#	gpg --batch --verify /usr/local/bin/rawdns.asc /usr/local/bin/rawdns; \
+#	rm -r "$GNUPGHOME" /usr/local/bin/rawdns.asc; \
+	\
+	chmod +x /usr/local/bin/rawdns; \
+	\
+	apk del .fetch-deps
+
+COPY example-config.json ./
+
+CMD ["rawdns"]
