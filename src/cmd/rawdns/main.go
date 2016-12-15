@@ -10,6 +10,7 @@ import (
 	"net"
 	"os"
 	"os/signal"
+	"regexp"
 	"runtime"
 	"strings"
 
@@ -29,6 +30,9 @@ type DomainConfig struct {
 	TLSCACert string `json:"tlscacert"`
 	TLSCert   string `json:"tlscert"`
 	TLSKey    string `json:"tlskey"`
+
+	// Domain name rewriting
+  Rewrite map[string]string `json:"rewrite"`
 
 	// IP address strategy
 	SwarmNode bool `json:"swarmnode"`
@@ -78,9 +82,23 @@ func main() {
 				}
 			}
 
+			var trPairs map[*regexp.Regexp]string
+			trPairs = make(map[*regexp.Regexp]string)
+			if config[domain].Rewrite != nil {
+				for trRegexpStr, trReplace := range config[domain].Rewrite {
+					var err error
+					var trRegexp *regexp.Regexp
+					trRegexp , err = regexp.Compile(trRegexpStr)
+					trPairs[trRegexp] = trReplace
+					if err != nil {
+						log.Fatalf("error: Unable to parse regexp %s: %s", config[domain].Rewrite, err)
+					}
+				}
+			}
+
 			dCopy := domain
 			dns.HandleFunc(dCopy, func(w dns.ResponseWriter, r *dns.Msg) {
-				handleDockerRequest(dCopy, tlsConfig, w, r)
+				handleDockerRequest(dCopy, tlsConfig, trPairs, w, r)
 			})
 		case "forwarding":
 			// TODO there must be a better way to pass "domain" along without an anonymous function AND copied variable
@@ -167,7 +185,7 @@ func dnsAppend(q dns.Question, m *dns.Msg, rr dns.RR) {
 	}
 }
 
-func handleDockerRequest(domain string, tlsConfig *tls.Config, w dns.ResponseWriter, r *dns.Msg) {
+func handleDockerRequest(domain string, tlsConfig *tls.Config, trPairs map[*regexp.Regexp]string, w dns.ResponseWriter, r *dns.Msg) {
 	m := new(dns.Msg)
 	m.SetReply(r)
 	defer w.WriteMsg(m)
@@ -180,6 +198,11 @@ func handleDockerRequest(domain string, tlsConfig *tls.Config, w dns.ResponseWri
 			return
 		}
 		containerName := name[:len(name)-len(domainSuffix)]
+
+		// translate the container name using configured regexps
+		for trRegexp, trReplace := range trPairs {
+			containerName = trRegexp.ReplaceAllString(containerName, trReplace)
+		}
 
 		ips, err := dockerGetIpList(config[domain].Socket, containerName, tlsConfig, config[domain].SwarmNode)
 		if err != nil && strings.Contains(containerName, ".") {
