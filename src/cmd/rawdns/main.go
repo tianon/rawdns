@@ -37,13 +37,21 @@ type DomainConfig struct {
 	Nameservers []string `json:"nameservers"` // [ "8.8.8.8", "8.8.4.4" ]
 
 	// "type": "static"
-	Addrs  []string   `json:"addrs"`
-	Cnames []string   `json:"cnames"`
-	Txts   [][]string `json:"txts"`
+	Addrs  []string          `json:"addrs"`
+	Cnames []string          `json:"cnames"`
+	Txts   [][]string        `json:"txts"`
+	Srvs   []DomainConfigSrv `json:"srvs"`
 	// pre-calculated/parsed
 	addrs  []net.IP   // net.ParseIP(Addrs)
 	cnames []string   // dns.Fqdn(Cnames)
 	txts   [][]string // strings.Replace(Txts, `\`, `\\`, -1)
+}
+
+type DomainConfigSrv struct {
+	Priority uint16 `json:"priority"`
+	Weight   uint16 `json:"weight"`
+	Port     uint16 `json:"port"`
+	Target   string `json:"target"`
 }
 
 var config Config
@@ -155,6 +163,9 @@ func dnsAppend(q dns.Question, m *dns.Msg, rr dns.RR) {
 	} else if rrS, ok := rr.(*dns.TXT); ok {
 		hdr.Rrtype = dns.TypeTXT
 		rrS.Hdr = hdr
+	} else if rrS, ok := rr.(*dns.SRV); ok {
+		hdr.Rrtype = dns.TypeSRV
+		rrS.Hdr = hdr
 	} else {
 		log.Printf("error: unknown dnsAppend RR type: %+v\n", rr)
 		return
@@ -249,6 +260,15 @@ func handleStaticRequest(config DomainConfig, w dns.ResponseWriter, r *dns.Msg) 
 
 		for _, txt := range config.txts {
 			dnsAppend(q, m, &dns.TXT{Txt: txt})
+		}
+
+		for _, srv := range config.Srvs {
+			dnsAppend(q, m, &dns.SRV{
+				Priority: srv.Priority,
+				Weight:   srv.Weight,
+				Port:     srv.Port,
+				Target:   srv.Target,
+			})
 		}
 	}
 }
