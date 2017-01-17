@@ -12,14 +12,19 @@ env:
 matrix:
   include:
     - go: 1.7.x
-      env:
-        - GIMME_ARCH=arm GOARM=5
-        - GIMME_ARCH=arm GOARM=6
-        - GIMME_ARCH=arm GOARM=7
-        - GIMME_ARCH=arm64
-        - GIMME_ARCH=ppc64
-        - GIMME_ARCH=ppc64le
-        - GIMME_ARCH=s390x
+      env: GIMME_ARCH=arm GOARM=5
+    - go: 1.7.x
+      env: GIMME_ARCH=arm GOARM=6
+    - go: 1.7.x
+      env: GIMME_ARCH=arm GOARM=7
+    - go: 1.7.x
+      env: GIMME_ARCH=arm64
+    - go: 1.7.x
+      env: GIMME_ARCH=ppc64
+    - go: 1.7.x
+      env: GIMME_ARCH=ppc64le
+    - go: 1.7.x
+      env: GIMME_ARCH=s390x
 
 install:
   - export GOPATH="$PWD/src:$PWD/vendor"
