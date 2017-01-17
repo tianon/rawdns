@@ -19,6 +19,7 @@ matrix:
         - GIMME_ARCH=arm64
         - GIMME_ARCH=ppc64
         - GIMME_ARCH=ppc64le
+        - GIMME_ARCH=s390x
 
 install:
   - export GOPATH="$PWD/src:$PWD/vendor"
