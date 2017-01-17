@@ -16,6 +16,9 @@ matrix:
         - GIMME_ARCH=arm GOARM=5
         - GIMME_ARCH=arm GOARM=6
         - GIMME_ARCH=arm GOARM=7
+        - GIMME_ARCH=arm64
+        - GIMME_ARCH=ppc64
+        - GIMME_ARCH=ppc64le
 
 install:
   - export GOPATH="$PWD/src:$PWD/vendor"
