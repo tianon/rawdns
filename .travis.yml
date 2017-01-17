@@ -1,8 +1,11 @@
 language: go
 
 go:
-  - 1.6
-  - 1.5
+  - 1.8rc1
+  # TODO 1.8.x instead -- https://github.com/travis-ci/travis-build/pull/930
+  - 1.7.x
+  - 1.6.x
+  - 1.5.x
 
 env:
     - GIMME_ARCH=amd64
