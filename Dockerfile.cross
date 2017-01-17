@@ -29,3 +29,7 @@ RUN set -x \
 	&& eval "GOARCH=ppc64le go build $BUILD_FLAGS -o /go/bin/rawdns-ppc64el"
 RUN set -x \
 	&& eval "GOARCH=s390x go build $BUILD_FLAGS -o /go/bin/rawdns-s390x"
+
+RUN set -x \
+	&& apk add --no-cache file \
+	&& file /go/bin/rawdns-*
