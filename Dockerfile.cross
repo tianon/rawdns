@@ -1,4 +1,4 @@
-FROM golang:1.6-alpine
+FROM golang:1.7-alpine
 
 # disable CGO for ALL THE THINGS (to help ensure no libc)
 ENV CGO_ENABLED 0
@@ -27,3 +27,5 @@ RUN set -x \
 	&& eval "GOARCH=ppc64 go build $BUILD_FLAGS -o /go/bin/rawdns-ppc64"
 RUN set -x \
 	&& eval "GOARCH=ppc64le go build $BUILD_FLAGS -o /go/bin/rawdns-ppc64el"
+RUN set -x \
+	&& eval "GOARCH=s390x go build $BUILD_FLAGS -o /go/bin/rawdns-s390x"

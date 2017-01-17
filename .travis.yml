@@ -1,19 +1,36 @@
 language: go
 
 go:
-  - 1.6
-  - 1.5
-
+  - 1.8rc1
+  # TODO 1.8.x instead -- https://github.com/travis-ci/travis-build/pull/930
+  - 1.7.x
+  - 1.6.x
+  - 1.5.x
 env:
-    - GIMME_ARCH=amd64
-    - GIMME_ARCH=386
-    - GIMME_ARCH=arm GOARM=5
-    - GIMME_ARCH=arm GOARM=6
-    - GIMME_ARCH=arm GOARM=7
+  - GIMME_ARCH=amd64
+  - GIMME_ARCH=386
+matrix:
+  include:
+    - go: 1.7.x
+      env: GIMME_ARCH=arm GOARM=5
+    - go: 1.7.x
+      env: GIMME_ARCH=arm GOARM=6
+    - go: 1.7.x
+      env: GIMME_ARCH=arm GOARM=7
+    - go: 1.7.x
+      env: GIMME_ARCH=arm64
+    - go: 1.7.x
+      env: GIMME_ARCH=ppc64
+    - go: 1.7.x
+      env: GIMME_ARCH=ppc64le
+    - go: 1.7.x
+      env: GIMME_ARCH=s390x
 
 install:
-    - export GOPATH="$PWD/src:$PWD/vendor"
-    - cd src
+  - export GOPATH="$PWD/src:$PWD/vendor"
+  - cd src
 
 script:
-    - go build -v ./...
+  - go build -v ./...
+
+# vim:set et ts=2 sw=2:
