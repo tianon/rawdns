@@ -13,7 +13,7 @@ $ docker run -d --name apt-cacher-ng --dns 8.8.8.8 --dns 8.8.4.4 tianon/apt-cach
 Add the following to your `config.json` for rawdns:
 
 ```json
-	"httpredir.debian.org.": {
+	"deb.debian.org.": {
 		"type": "static",
 		"cnames": [ "apt-cacher-ng.docker" ],
 		"nameservers": [ "127.0.0.1" ]
