@@ -38,7 +38,7 @@ func handleForwardingRaw(nameservers []string, req *dns.Msg, remote net.Addr) *d
 	)
 	// Use request Id for "random" nameserver selection.
 	nsid := int(req.Id) % len(nameservers)
-	dnsClient := &dns.Client{Net: "udp", ReadTimeout: 4 * time.Second, WriteTimeout: 4 * time.Second, SingleInflight: true}
+	dnsClient := &dns.Client{Net: "udp", Timeout: 4 * time.Second, SingleInflight: true}
 	if tcp {
 		dnsClient.Net = "tcp"
 	}
