@@ -18,10 +18,18 @@ Add the following to your `config.json` for rawdns:
 		"cnames": [ "apt-cacher-ng.docker" ],
 		"nameservers": [ "127.0.0.1" ]
 	},
+	"_http._tcp.deb.debian.org.": {
+		"type": "static",
+		"srvs": [ { "port": 80, "target": "apt-cacher-ng.docker." } ]
+	},
 	"archive.ubuntu.com.": {
 		"type": "static",
 		"cnames": [ "apt-cacher-ng.docker" ],
 		"nameservers": [ "127.0.0.1" ]
+	},
+	"_http._tcp.archive.ubuntu.com.": {
+		"type": "static",
+		"srvs": [ { "port": 80, "target": "apt-cacher-ng.docker." } ]
 	},
 ```
 
