@@ -101,7 +101,7 @@ uses public key cryptography to sign resource records. The
 public keys are stored in DNSKEY records and the signatures in RRSIG records.
 
 Requesting DNSSEC information for a zone is done by adding the DO (DNSSEC OK) bit
-to an request.
+to a request.
 
      m := new(dns.Msg)
      m.SetEdns0(4096, true)
@@ -203,7 +203,7 @@ RFC 6895 sets aside a range of type codes for private use. This range
 is 65,280 - 65,534 (0xFF00 - 0xFFFE). When experimenting with new Resource Records these
 can be used, before requesting an official type code from IANA.
 
-see http://miek.nl/posts/2014/Sep/21/Private%20RRs%20and%20IDN%20in%20Go%20DNS/ for more
+see http://miek.nl/2014/September/21/idn-and-private-rr-in-go-dns/ for more
 information.
 
 EDNS0
