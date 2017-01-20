@@ -171,7 +171,7 @@ func dnsAppend(q dns.Question, m *dns.Msg, rr dns.RR) {
 		return
 	}
 
-	if q.Qtype == dns.TypeANY || q.Qtype == rr.Header().Rrtype {
+	if q.Qtype == dns.TypeANY || q.Qtype == rr.Header().Rrtype || rr.Header().Rrtype == dns.TypeCNAME {
 		m.Answer = append(m.Answer, rr)
 	} else {
 		m.Extra = append(m.Extra, rr)
@@ -240,20 +240,23 @@ func handleStaticRequest(config DomainConfig, w dns.ResponseWriter, r *dns.Msg) 
 			dnsAppend(q, m, &dns.CNAME{Target: cname})
 
 			if r.RecursionDesired && len(config.Nameservers) > 0 {
+				recQ := dns.Question{
+					Name:   cname,
+					Qtype:  q.Qtype,
+					Qclass: q.Qclass,
+				}
 				recR := &dns.Msg{
 					MsgHdr: dns.MsgHdr{
 						Id: dns.Id(),
 					},
-					Question: []dns.Question{
-						{Name: cname, Qtype: q.Qtype, Qclass: q.Qclass},
-					},
+					Question: []dns.Question{recQ},
 				}
 				recM := handleForwardingRaw(config.Nameservers, recR, w.RemoteAddr())
 				for _, rr := range recM.Answer {
-					dnsAppend(q, m, rr)
+					dnsAppend(recQ, m, rr)
 				}
 				for _, rr := range recM.Extra {
-					dnsAppend(q, m, rr)
+					dnsAppend(recQ, m, rr)
 				}
 			}
 		}
