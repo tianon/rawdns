@@ -32,6 +32,7 @@ type DomainConfig struct {
 
 	// IP address strategy
 	SwarmNode bool `json:"swarmnode"`
+	SwarmMode bool `json:"swarmmode"`
 
 	// "type": "forwarding"
 	Nameservers []string `json:"nameservers"` // [ "8.8.8.8", "8.8.4.4" ]
@@ -84,6 +85,10 @@ func main() {
 				if err != nil {
 					log.Fatalf("error: Unable to load tls config for %s: %s\n", domain, err)
 				}
+			}
+
+			if config[domain].SwarmMode && config[domain].SwarmNode {
+				log.Fatalf("invalid configuration: cannot be swarmNode and swarmMode at the same time, ignoring swarmNode")
 			}
 
 			dCopy := domain
@@ -190,25 +195,25 @@ func handleDockerRequest(domain string, tlsConfig *tls.Config, w dns.ResponseWri
 			log.Printf("error: request for unknown domain %q (in %q)\n", name, domain)
 			return
 		}
-		containerName := name[:len(name)-len(domainSuffix)]
+		domainPrefix := name[:len(name)-len(domainSuffix)]
 
-		ips, err := dockerGetIpList(config[domain].Socket, containerName, tlsConfig, config[domain].SwarmNode)
-		if err != nil && strings.Contains(containerName, ".") {
+		ips, err := dockerGetIpList(config[domain].Socket, domainPrefix, tlsConfig, config[domain].SwarmNode, config[domain].SwarmMode)
+		if err != nil && strings.Contains(domainPrefix, ".") {
 			// we have something like "db.app", so let's try looking up a "app/db" container (linking!)
-			parts := strings.Split(containerName, ".")
+			parts := strings.Split(domainPrefix, ".")
 			var linkedContainerName string
 			for i := range parts {
 				linkedContainerName += "/" + parts[len(parts)-i-1]
 			}
-			ips, err = dockerGetIpList(config[domain].Socket, linkedContainerName, tlsConfig, config[domain].SwarmNode)
+			ips, err = dockerGetIpList(config[domain].Socket, linkedContainerName, tlsConfig, config[domain].SwarmNode, config[domain].SwarmMode)
 		}
 		if err != nil {
-			log.Printf("error: failed to lookup container %q: %v\n", containerName, err)
+			log.Printf("error: failed to lookup domain prefix %q: %v\n", domainPrefix, err)
 			return
 		}
 
 		if len(ips) == 0 {
-			log.Printf("error: container %q is IP-less\n", containerName)
+			log.Printf("error: domain prefix %q is IP-less\n", domainPrefix)
 			return
 		}
 
