@@ -31,8 +31,9 @@ type DomainConfig struct {
 	TLSKey    string `json:"tlskey"`
 
 	// IP address strategy
-	SwarmNode bool `json:"swarmnode"`
-	SwarmMode bool `json:"swarmmode"`
+	SwarmNode bool   `json:"swarmnode"`
+	NetworkID string `json:"networkId"` // When using swarmmode this will filter vips for a network
+	SwarmMode bool   `json:"swarmmode"`
 
 	// "type": "forwarding"
 	Nameservers []string `json:"nameservers"` // [ "8.8.8.8", "8.8.4.4" ]
@@ -197,7 +198,7 @@ func handleDockerRequest(domain string, tlsConfig *tls.Config, w dns.ResponseWri
 		}
 		domainPrefix := name[:len(name)-len(domainSuffix)]
 
-		ips, err := dockerGetIpList(config[domain].Socket, domainPrefix, tlsConfig, config[domain].SwarmNode, config[domain].SwarmMode)
+		ips, err := dockerGetIpList(config[domain].Socket, domainPrefix, tlsConfig, config[domain].SwarmNode, config[domain].SwarmMode, config[domain].NetworkID)
 		if err != nil && strings.Contains(domainPrefix, ".") {
 			// we have something like "db.app", so let's try looking up a "app/db" container (linking!)
 			parts := strings.Split(domainPrefix, ".")
@@ -205,7 +206,7 @@ func handleDockerRequest(domain string, tlsConfig *tls.Config, w dns.ResponseWri
 			for i := range parts {
 				linkedContainerName += "/" + parts[len(parts)-i-1]
 			}
-			ips, err = dockerGetIpList(config[domain].Socket, linkedContainerName, tlsConfig, config[domain].SwarmNode, config[domain].SwarmMode)
+			ips, err = dockerGetIpList(config[domain].Socket, linkedContainerName, tlsConfig, config[domain].SwarmNode, config[domain].SwarmMode, config[domain].NetworkID)
 		}
 		if err != nil {
 			log.Printf("error: failed to lookup domain prefix %q: %v\n", domainPrefix, err)

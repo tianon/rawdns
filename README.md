@@ -85,7 +85,7 @@ rtt min/avg/max/mdev = 0.025/0.038/0.049/0.011 ms
 
 ## swarm mode (Docker 1.12) support
 
-`rawdns` can be used with swarm mode by creating a configuration with the `swarmmode` set to true.  The `swarmnode` option enables `rawdns` to query by service name instead of container name it will return the assigned virtual ip for the service.
+`rawdns` can be used with swarm mode by creating a configuration with the `swarmmode` set to true.  The `swarmnode` option enables `rawdns` to query by service name instead of container name it will return the assigned virtual ip for the service. You can at the same time filter vip, which belong to a given network (use the `networkId` for this).
 
 Example swarm configuration:
 
@@ -95,6 +95,7 @@ Example swarm configuration:
         "type": "containers",
         "socket": "unix:///var/run/docker.sock",
         "swarmmode": true,
+        "networkId": "2zcqib9vlz6fa0gotr525dgcm",
         "tlsverify": true,
         "tlscacert": "/var/lib/docker/swarm/certificates/swarm-root-ca.crt",
         "tlscert": "/var/lib/docker/swarm/certificates/swarm-node.crt",
@@ -104,6 +105,7 @@ Example swarm configuration:
         "type": "containers",
         "socket": "unix:///var/run/docker.sock",
         "swarmmode": true,
+        "networkId": "2zcqib9vlz6fa0gotr525dgcm",
         "tlsverify": true,
         "tlscacert": "/var/lib/docker/swarm/certificates/swarm-root-ca.crt",
         "tlscert": "/var/lib/docker/swarm/certificates/swarm-node.crt",

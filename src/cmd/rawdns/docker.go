@@ -77,7 +77,7 @@ type dockerService struct {
 	}
 }
 
-func dockerGetIpList(dockerHost, domainPrefixOrContainerName string, tlsConfig *tls.Config, swarmNode bool, swarmMode bool) ([]net.IP, error) {
+func dockerGetIpList(dockerHost, domainPrefixOrContainerName string, tlsConfig *tls.Config, swarmNode bool, swarmMode bool, networkID string) ([]net.IP, error) {
 	var (
 		container *dockerContainer
 		service   *dockerService
@@ -93,6 +93,10 @@ func dockerGetIpList(dockerHost, domainPrefixOrContainerName string, tlsConfig *
 
 			ips := []net.IP{}
 			for _, vip := range service.Endpoint.VirtualIps {
+				if networkID != "" && vip.NetworkID != networkID {
+					continue
+				}
+
 				ip, _, err := net.ParseCIDR(vip.Addr)
 				if err != nil {
 					return nil, err
