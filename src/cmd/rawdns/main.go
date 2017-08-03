@@ -236,27 +236,26 @@ func handleDockerRequest(domain string, tlsConfig *tls.Config, w dns.ResponseWri
 		for _, host := range hosts {
 			//log.Printf("[debug] handleDockerRequest: host %+v\n", host)
 
-			/*(q.Qtype == dns.TypeSRV || q.Qtype == dns.TypeANY) &&*/
 			switch {
 			case host.Name != "" && host.TasksID != "" && host.Slot > 0 && host.Network.Name != "":
 				fqdn := fmt.Sprintf("%v-%v.%v.%v.%v", host.Name, host.Slot, host.TasksID, host.Network.Name, domain)
 				cname := fmt.Sprintf("%v-%v.%v.%v", host.Name, host.Slot, host.Network.Name, domain)
 				//log.Printf("[debug] handleDockerRequest: FQDN=%q, CNAME=%q\n", fqdn, cname)
 
-				for _, port := range host.Ports {
-					dnsAppend(q, m, &dns.SRV{
-						//Hdr: dns.RR_Header{Name: fqdn, Rrtype: dns.TypeSRV, Class: q.Qclass, Ttl: 0},
-						Port:   port,
-						Target: fqdn,
-					})
+				if q.Qtype == dns.TypeSRV || q.Qtype == dns.TypeANY {
+					for _, port := range host.Ports {
+						dnsAppend(q, m, &dns.SRV{
+							Port:   port,
+							Target: fqdn,
+						})
+					}
 				}
-
 				if ip4 := host.Ip.To4(); ip4 != nil {
 					dnsAppend(q, m, &dns.A{
 						Hdr: dns.RR_Header{Name: fqdn, Rrtype: dns.TypeA, Class: q.Qclass, Ttl: 0},
 						A: ip4 })
 
-					if ! host.Network.Ingress {
+					if (q.Qtype == dns.TypeSRV || q.Qtype == dns.TypeANY) && ! host.Network.Ingress {
 						dnsAppend(q, m, &dns.CNAME{
 							Hdr: dns.RR_Header{Name: cname, Rrtype: dns.TypeCNAME, Class: q.Qclass, Ttl: 0},
 							Target: fqdn })

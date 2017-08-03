@@ -74,6 +74,9 @@ type dockerService struct {
 		Name string
 	}
 	Endpoint struct {
+		Spec      struct {
+			Mode string         // vip or dnsrr
+		}
 		Ports      []Port
 		VirtualIps []struct {
 			NetworkID string
@@ -85,6 +88,7 @@ type Port struct {
 	Protocol      string
 	TargetPort    uint16
 	PublishedPort uint16
+	PublishMode   string    // ingress or host
 }
 
 type dockerTasks struct {
@@ -95,7 +99,13 @@ type dockerTasks struct {
 	CreatedAt string
 	UpdatedAt string
 	ServiceID string
-	Slot int
+	Slot      int
+	NodeID    string
+	Status struct {
+		PortStatus struct {
+			Ports  []Port       // ports in case of PublishMode: "host"
+		}
+	}
 	NetworksAttachments []struct {
 		Network struct {
 			ID string
@@ -105,6 +115,18 @@ type dockerTasks struct {
 			}
 		}
 		Addresses []string
+	}
+}
+type dockerNode struct {
+	ID       string
+	Spec struct {
+		Name     string
+	}
+	Description struct {
+		Hostname string
+	}
+	Status struct {
+		Addr     string
 	}
 }
 type dockerTasksFilter struct {
@@ -118,6 +140,10 @@ type Network struct {
 	Id      string
 	Name    string
 	Ingress bool
+	Peers   []struct {
+		Name  string
+		IP    string
+	}
 }
 type dockerHosts struct {
 	Name        string
@@ -150,6 +176,12 @@ func dockerGetIpList(dockerHost, domainPrefixOrContainerName string, tlsConfig *
 			}
 			if discoverTasks && !filter.DiscoverTasks {
 				filter.DiscoverTasks = discoverTasks
+			}
+			/* for endpoint_mode: dnsrr - we have no VIP or other IPs for service, thus force service discovery to get task's IPs
+			 * for endpoint_mode: vip - we have VIPs for the service, no need to return IPs for directly bound to nodes ports
+			 */
+			if service.Endpoint.Spec.Mode == "dnsrr" {
+				filter.DiscoverTasks = true
 			}
 
 			if filter.DiscoverTasks {
@@ -192,6 +224,22 @@ func dockerGetIpList(dockerHost, domainPrefixOrContainerName string, tlsConfig *
 							if err != nil {
 								return nil, err
 							}
+							// to swarm external access we need to convert swarm local IP to a node (peer) IP
+							if netAttachments.Network.Spec.Ingress {
+								ingress, err := dockerInspectNetwork(dockerHost, netAttachments.Network.ID, tlsConfig, apiVersion)
+								if err != nil {
+									log.Printf("error: %v\n", err)
+								} else {
+									if ingress.Peers != nil {
+										for _, peer := range ingress.Peers {
+											pIp := net.ParseIP(peer.IP)
+											if pIp != nil {
+												ip = pIp
+											}
+										}
+									}
+								}
+							}
 							ports := targetPorts
 							if netAttachments.Network.Spec.Ingress {
 								ports = publishedPorts
@@ -203,11 +251,43 @@ func dockerGetIpList(dockerHost, domainPrefixOrContainerName string, tlsConfig *
 									Slot:        task.Slot,
 									TasksID:     task.ID,
 									Network:     Network{
-													netAttachments.Network.ID,
-													taskNetworkName,
-													netAttachments.Network.Spec.Ingress,
+													Id:      netAttachments.Network.ID,
+													Name:    taskNetworkName,
+													Ingress: netAttachments.Network.Spec.Ingress,
 									},
 							})
+						}
+					}
+					// PublishedPort's with PublishMode: "host"
+					// in the case in addition to the ingress endpoint might be exist directly bound ports to a node host ports
+					if len(task.Status.PortStatus.Ports) > 0 {
+						if filter.NetworkOrId != "" && (filter.NetworkOrId != "bridge" && filter.NetworkOrId != "ingress") {
+							continue
+						}
+						ports := []uint16{}
+						for _, port := range task.Status.PortStatus.Ports {
+							// host network, peer IP
+							ports = append(ports, port.PublishedPort)
+						}
+
+						node, err := dockerInspectNode(dockerHost, task.NodeID, tlsConfig, apiVersion)
+						if err != nil {
+							log.Printf("error: %v\n", err)
+						} else {
+							//log.Printf("[debug] dockerGetIpList: node %+v\n", node)
+							nodeIp := net.ParseIP(node.Status.Addr)
+							if nodeIp != nil {
+								hosts = append(hosts, dockerHosts{
+										Name:        strings.Replace(service.Spec.Name, "_", "-", -1),
+										Ip:          nodeIp,
+										Ports:       ports,
+										Slot:        task.Slot,
+										TasksID:     task.ID,
+										Network:     Network{
+														Name:    "bridge",
+										},
+								})
+							}
 						}
 					}
 				}
@@ -243,12 +323,33 @@ func dockerGetIpList(dockerHost, domainPrefixOrContainerName string, tlsConfig *
 						return nil, err
 					}
 
+					// to swarm external access we need to convert swarm local IP to a node (peer) IP
+					if ingress {
+						ingressNet, err := dockerInspectNetwork(dockerHost, vip.NetworkID, tlsConfig, apiVersion)
+						if err != nil {
+							log.Printf("error: %v\n", err)
+						} else {
+							if ingressNet.Peers != nil {
+								for _, peer := range ingressNet.Peers {
+									pIp := net.ParseIP(peer.IP)
+									if pIp != nil {
+										ip = pIp
+									}
+								}
+							}
+						}
+					}
+
 					hosts = append(hosts, dockerHosts{
 							Name: domainPrefixOrContainerName,
 							Ip: ip,
-							Network: Network{vip.NetworkID, normNetName, ingress},
+							Network: Network{vip.NetworkID, normNetName, ingress, nil},
 					})
 				}
+				/* for PublishMode: "host"
+				 * and endpoint_mode: vip - we have VIPs for the service, no need to return IPs for directly bound to nodes ports
+				 * for endpoint_mode: dnsrr - service discovery is forced
+				 */
 
 				return hosts, nil
 			}
@@ -356,11 +457,25 @@ func dockerDiscoverService(dockerHost, serviceName string, tlsConfig *tls.Config
 	return service, &res, nil
 }
 func dockerDiscoverStackedService(dockerHost, serviceName string, tlsConfig *tls.Config, apiVersion string) (*dockerService, error) {
-	// Docker compose/stack prepends "stackname_" to service name, but underscore isn't allowed in DNS names.
-	// let's try looking up a "stackname-servicename" as "stackname_servicename"
+	// Docker compose/stack prepends "stack-name_" to service name, but underscore isn't allowed in DNS names.
+	// let's try looking up a "stack-name-service-name" as "stack-name_service-name"
 	tmpServiceName := strings.Replace(serviceName, "-", "_", 1)
 	service, err := dockerInspectService(dockerHost, tmpServiceName, tlsConfig, apiVersion)
 
+	// stack-name might contain dash
+	if err != nil && strings.Count(serviceName, "-") > 1 {
+		inx := strings.Index(tmpServiceName, "-")
+		for err != nil && inx != -1 && inx < len(serviceName) {
+			tmpServiceName := serviceName[:inx] + strings.Replace(serviceName[inx:], "-", "_", 1)
+			service, err = dockerInspectService(dockerHost, tmpServiceName, tlsConfig, apiVersion)
+
+			if strings.Index(tmpServiceName[inx:], "-") == -1 {
+				inx = strings.Index(tmpServiceName[inx:], "-")
+			} else {
+				inx = inx + strings.Index(tmpServiceName[inx:], "-")
+			}
+		}
+	}
 	return service, err
 }
 
@@ -477,6 +592,65 @@ func dockerInspectNetworks(dockerHost string, tlsConfig *tls.Config, apiVersion 
 	ret := map[string]Network{}
 	for _, net := range nets {
 		ret[net.Id] = net
+	}
+ 	return &ret, nil
+}
+
+func dockerInspectNetwork(dockerHost string, networkName string, tlsConfig *tls.Config, apiVersion string) (*Network, error) {
+	//log.Printf("[debug] dockerInspectNetwork: networkName %q\n", serviceName)
+	u, err := url.Parse(dockerHost)
+	if err != nil {
+		return nil, fmt.Errorf("failed parsing URL '%s': %v", dockerHost, err)
+	}
+	client := httpClient(u, tlsConfig)
+	// URL: /"+apiVersion+"/networks/networkName", nil)
+	req, err := http.NewRequest("GET", u.String()+"/"+apiVersion+"/networks/"+networkName, nil)
+	if err != nil {
+		return nil, fmt.Errorf("failed creating request: %v", err)
+	}
+	//log.Printf("[debug] Request: %q\n", req.URL)
+
+	resp, err := client.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("failed HTTP request: %v", err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != 200 {
+		return nil, fmt.Errorf("not '200 OK': %v", resp.Status)
+	}
+	net := Network{}
+	err = json.NewDecoder(resp.Body).Decode(&net)
+	if err != nil {
+		return nil, fmt.Errorf("failed decoding JSON response: %v", net)
+	}
+ 	return &net, nil
+}
+func dockerInspectNode(dockerHost string, nodeName string, tlsConfig *tls.Config, apiVersion string) (*dockerNode, error) {
+	//log.Printf("[debug] dockerInspectNetwork: networkName %q\n", serviceName)
+	u, err := url.Parse(dockerHost)
+	if err != nil {
+		return nil, fmt.Errorf("failed parsing URL '%s': %v", dockerHost, err)
+	}
+	client := httpClient(u, tlsConfig)
+	// URL: /"+apiVersion+"/networks/networkName", nil)
+	req, err := http.NewRequest("GET", u.String()+"/"+apiVersion+"/nodes/"+nodeName, nil)
+	if err != nil {
+		return nil, fmt.Errorf("failed creating request: %v", err)
+	}
+	//log.Printf("[debug] Request: %q\n", req.URL)
+
+	resp, err := client.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("failed HTTP request: %v", err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != 200 {
+		return nil, fmt.Errorf("not '200 OK': %v", resp.Status)
+	}
+	ret := dockerNode{}
+	err = json.NewDecoder(resp.Body).Decode(&ret)
+	if err != nil {
+		return nil, fmt.Errorf("failed decoding JSON response: %v", ret)
 	}
  	return &ret, nil
 }
