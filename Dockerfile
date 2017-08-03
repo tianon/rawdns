@@ -1,8 +1,7 @@
-FROM golang:1.7-alpine
-
-RUN apk add --no-cache ca-certificates openssl
+FROM golang:1.8-alpine as builder
 
 ENV GB_VERSION 0.4.2
+RUN apk add --no-cache openssl
 RUN set -x \
 	&& mkdir -p /go/src/github.com/constabulary \
 	&& cd /go/src/github.com/constabulary \
@@ -13,9 +12,13 @@ RUN set -x \
 	&& go install -v ./...
 
 WORKDIR /usr/src/rawdns
-ENV PATH /usr/src/rawdns/bin:$PATH
-
 COPY . .
-RUN gb build -ldflags '-s -w'
+RUN ls && gb build -ldflags '-s -w'
 
+
+FROM alpine:3.6
+RUN apk add --no-cache ca-certificates
+WORKDIR /
+COPY --from=builder /usr/src/rawdns/bin/rawdns /usr/local/bin/
+COPY example-config.json .
 CMD ["rawdns"]

@@ -1,8 +1,15 @@
+Extention of [tianon/rawdns](https://hub.docker.com/r/tianon/rawdns/) work with service tasks resolving, filtering and initial DNS Service Discovery for Swarm Mode.
+
 # ![rawdns](https://raw.githubusercontent.com/tianon/rawdns/master/logo-black.png)
 
-- [Docker Hub](https://index.docker.io/u/tianon/rawdns/)
-- [GitHub](https://github.com/tianon/rawdns)
-- [![Build Status](https://travis-ci.org/tianon/rawdns.svg)](https://travis-ci.org/tianon/rawdns)
+- Original
+  ** [Docker Hub](https://index.docker.io/u/tianon/rawdns/)
+  ** [GitHub](https://github.com/tianon/rawdns)
+  ** [![Build Status](https://travis-ci.org/tianon/rawdns.svg)](https://travis-ci.org/tianon/rawdns)
+- `swarm-mode` branch:
+  ** [Docker Hub](https://index.docker.io/u/stikhonenko/rawdns/)
+  ** [GitHub](https://github.com/sergey-tikhonenko/rawdns)
+  ** [![Build Status](https://api.travis-ci.org/sergey-tikhonenko/rawdns.svg?branch=swarm-mode)](https://travis-ci.org/sergey-tikhonenko/rawdns)
 
 Save as `/etc/rawdns/config.json`:
 

@@ -1,7 +1,7 @@
 version: '3.3'
 
 services:
-  rawdns:
+  dns:
     #image: tianon/rawdns
     image: stikhonenko/rawdns
     #command: rawdns /etc/rawdns/config.json

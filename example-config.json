@@ -1,10 +1,10 @@
 {
-    "swarm.": {
-        "type": "containers",
-        "socket": "unix:///var/run/docker.sock",
-        "swarmmode": true
-    },
- 	"docker.": {
+	"swarm.": {
+		"type": "containers",
+		"socket": "unix:///var/run/docker.sock",
+		"swarmmode": true
+	},
+	"docker.": {
 		"type": "containers",
 		"socket": "unix:///var/run/docker.sock"
 	},
