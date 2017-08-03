@@ -1,4 +1,6 @@
 /bin/
-/pkg/
+pkg/
 /rawdns*
 .vscode
+.project
+.settings

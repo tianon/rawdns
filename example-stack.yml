@@ -1,0 +1,41 @@
+version: '3.3'
+
+services:
+  rawdns:
+    #image: tianon/rawdns
+    image: stikhonenko/rawdns
+    #command: rawdns /etc/rawdns/config.json
+    ports:
+      - "53:53/tcp"
+      - "53:53/udp"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+    #configs:
+    #  - source: rawdns-config
+    #    target: /etc/rawdns/config.json
+    networks:
+      - pub
+
+  whoami:
+    image: emilevauge/whoami
+    hostname: '{{index .Service.Labels "com.docker.stack.namespace"}}-whoami-{{.Task.Slot}}.{{index .Service.Labels "com.docker.stack.namespace"}}-pub.swarm'
+    ports:
+     - "8080:80"
+    networks:
+      - pub
+    environment:
+      - "Service_ID={{.Service.ID}}"
+      - "Service_Name={{.Service.Name}}"
+      - "Node_ID={{.Node.ID}}"
+      - "Task_ID={{.Task.ID}}"
+      - "Task_Name={{.Task.Name}}"
+      - "Task_Slot={{.Task.Slot}}"
+    deploy:
+      replicas: 2
+
+networks:
+  pub:
+  
+#configs:
+#  rawdns-config:
+#    file: ./example-config.json

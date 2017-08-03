@@ -1,4 +1,4 @@
-package main // import "github.com/tianon/rawdns/src/cmd/rawdns"
+package main // import "cmd/rawdns"
 
 import (
 	"crypto/tls"
@@ -158,19 +158,28 @@ func dnsAppend(q dns.Question, m *dns.Msg, rr dns.RR) {
 	hdr := dns.RR_Header{Name: q.Name, Class: q.Qclass, Ttl: 0}
 
 	if rrS, ok := rr.(*dns.A); ok {
-		hdr.Rrtype = dns.TypeA
-		rrS.Hdr = hdr
+		if rrS.Hdr.Rrtype == dns.TypeNone {
+			hdr.Rrtype = dns.TypeA
+			rrS.Hdr = hdr
+		}
 	} else if rrS, ok := rr.(*dns.AAAA); ok {
 		hdr.Rrtype = dns.TypeAAAA
 		rrS.Hdr = hdr
 	} else if rrS, ok := rr.(*dns.CNAME); ok {
-		hdr.Rrtype = dns.TypeCNAME
-		rrS.Hdr = hdr
+		if rrS.Hdr.Rrtype == dns.TypeNone {
+			hdr.Rrtype = dns.TypeCNAME
+			rrS.Hdr = hdr
+		}
 	} else if rrS, ok := rr.(*dns.TXT); ok {
 		hdr.Rrtype = dns.TypeTXT
 		rrS.Hdr = hdr
 	} else if rrS, ok := rr.(*dns.SRV); ok {
-		hdr.Rrtype = dns.TypeSRV
+		if rrS.Hdr.Rrtype == dns.TypeNone {
+			hdr.Rrtype = dns.TypeSRV
+			rrS.Hdr = hdr
+		}
+	} else if rrS, ok := rr.(*dns.PTR); ok {
+		hdr.Rrtype = dns.TypePTR
 		rrS.Hdr = hdr
 	} else {
 		log.Printf("error: unknown dnsAppend RR type: %+v\n", rr)
@@ -178,8 +187,10 @@ func dnsAppend(q dns.Question, m *dns.Msg, rr dns.RR) {
 	}
 
 	if q.Qtype == dns.TypeANY || q.Qtype == rr.Header().Rrtype || rr.Header().Rrtype == dns.TypeCNAME {
+		//log.Printf("[debug] dnsAppend RR: [%+v] to Answer Qtype: %v, Rrtype: %v\n", rr, q.Qtype, rr.Header().Rrtype)
 		m.Answer = append(m.Answer, rr)
 	} else {
+		//log.Printf("[debug] dnsAppend RR: [%+v] to Extra Qtype: %v, Rrtype: %v\n", rr, q.Qtype, rr.Header().Rrtype)
 		m.Extra = append(m.Extra, rr)
 	}
 }
@@ -191,14 +202,18 @@ func handleDockerRequest(domain string, tlsConfig *tls.Config, w dns.ResponseWri
 
 	domainSuffix := "." + dns.Fqdn(domain)
 	for _, q := range r.Question {
+		//log.Printf("[debug] handleDockerRequest: Question %+v\n", q)
 		name := q.Name
 		if !strings.HasSuffix(name, domainSuffix) {
 			log.Printf("error: request for unknown domain %q (in %q)\n", name, domain)
 			return
 		}
+
 		domainPrefix := name[:len(name)-len(domainSuffix)]
 
-		ips, err := dockerGetIpList(config[domain].Socket, domainPrefix, tlsConfig, config[domain].SwarmNode, config[domain].SwarmMode, config[domain].NetworkID)
+		serviceDiscovery := (q.Qtype == dns.TypeSRV || q.Qtype == dns.TypeANY)
+
+		hosts, err := dockerGetIpList(config[domain].Socket, domainPrefix, tlsConfig, config[domain].SwarmNode, config[domain].SwarmMode, config[domain].NetworkID, serviceDiscovery)
 		if err != nil && strings.Contains(domainPrefix, ".") {
 			// we have something like "db.app", so let's try looking up a "app/db" container (linking!)
 			parts := strings.Split(domainPrefix, ".")
@@ -206,25 +221,71 @@ func handleDockerRequest(domain string, tlsConfig *tls.Config, w dns.ResponseWri
 			for i := range parts {
 				linkedContainerName += "/" + parts[len(parts)-i-1]
 			}
-			ips, err = dockerGetIpList(config[domain].Socket, linkedContainerName, tlsConfig, config[domain].SwarmNode, config[domain].SwarmMode, config[domain].NetworkID)
+			hosts, err = dockerGetIpList(config[domain].Socket, linkedContainerName, tlsConfig, config[domain].SwarmNode, config[domain].SwarmMode, config[domain].NetworkID, serviceDiscovery)
 		}
 		if err != nil {
 			log.Printf("error: failed to lookup domain prefix %q: %v\n", domainPrefix, err)
 			return
 		}
 
-		if len(ips) == 0 {
+		if len(hosts) == 0 {
 			log.Printf("error: domain prefix %q is IP-less\n", domainPrefix)
 			return
 		}
 
-		for _, ip := range ips {
-			if ip4 := ip.To4(); ip4 != nil {
-				dnsAppend(q, m, &dns.A{A: ip4})
-			} else {
-				dnsAppend(q, m, &dns.AAAA{AAAA: ip})
+		for _, host := range hosts {
+			//log.Printf("[debug] handleDockerRequest: host %+v\n", host)
+
+			/*(q.Qtype == dns.TypeSRV || q.Qtype == dns.TypeANY) &&*/
+			switch {
+			case host.Name != "" && host.TasksID != "" && host.Slot > 0 && host.Network.Name != "":
+				fqdn := fmt.Sprintf("%v-%v.%v.%v.%v", host.Name, host.Slot, host.TasksID, host.Network.Name, domain)
+				cname := fmt.Sprintf("%v-%v.%v.%v", host.Name, host.Slot, host.Network.Name, domain)
+				//log.Printf("[debug] handleDockerRequest: FQDN=%q, CNAME=%q\n", fqdn, cname)
+
+				for _, port := range host.Ports {
+					dnsAppend(q, m, &dns.SRV{
+						//Hdr: dns.RR_Header{Name: fqdn, Rrtype: dns.TypeSRV, Class: q.Qclass, Ttl: 0},
+						Port:   port,
+						Target: fqdn,
+					})
+				}
+
+				if ip4 := host.Ip.To4(); ip4 != nil {
+					dnsAppend(q, m, &dns.A{
+						Hdr: dns.RR_Header{Name: fqdn, Rrtype: dns.TypeA, Class: q.Qclass, Ttl: 0},
+						A: ip4 })
+
+					if ! host.Network.Ingress {
+						dnsAppend(q, m, &dns.CNAME{
+							Hdr: dns.RR_Header{Name: cname, Rrtype: dns.TypeCNAME, Class: q.Qclass, Ttl: 0},
+							Target: fqdn })
+					}
+				} else {
+					dnsAppend(q, m, &dns.AAAA{
+						Hdr: dns.RR_Header{Name: fqdn, Rrtype: dns.TypeAAAA, Class: q.Qclass, Ttl: 0},
+						AAAA: host.Ip})
+				}
+			case host.Name != "" && host.Network.Name != "":
+				fqdn := fmt.Sprintf("%v.%v.%v", host.Name, host.Network.Name, domain)
+				if ip4 := host.Ip.To4(); ip4 != nil {
+					dnsAppend(q, m, &dns.A{
+						Hdr: dns.RR_Header{Name: fqdn, Rrtype: dns.TypeA, Class: q.Qclass, Ttl: 0},
+						A: ip4 })
+				} else {
+					dnsAppend(q, m, &dns.AAAA{
+						Hdr: dns.RR_Header{Name: fqdn, Rrtype: dns.TypeAAAA, Class: q.Qclass, Ttl: 0},
+						AAAA: host.Ip})
+				}
+			default:
+				if ip4 := host.Ip.To4(); ip4 != nil {
+					dnsAppend(q, m, &dns.A{A: ip4})
+				} else {
+					dnsAppend(q, m, &dns.AAAA{AAAA: host.Ip})
+				}
 			}
 		}
+		//log.Printf("handleDockerRequest: Message: %+v\n", m)
 	}
 }
 
