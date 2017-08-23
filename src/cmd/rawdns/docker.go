@@ -11,6 +11,7 @@ import (
 	"strings"
 	"regexp"
 	"strconv"
+	"reflect"
 )
 
 var (
@@ -147,10 +148,10 @@ type Network struct {
 }
 type dockerHosts struct {
 	Name        string
-	Ip          net.IP
+	Ips         []net.IP
 	Ports       []uint16
 	Slot        int
-	TasksID     string
+	TaskID     string
 	Network     Network
 }
 func dockerGetIpList(dockerHost, domainPrefixOrContainerName string, tlsConfig *tls.Config, swarmNode bool, swarmMode bool, networkID string, serviceDiscovery bool) ([]dockerHosts, error) {
@@ -178,16 +179,22 @@ func dockerGetIpList(dockerHost, domainPrefixOrContainerName string, tlsConfig *
 				filter.DiscoverTasks = discoverTasks
 			}
 			/* for endpoint_mode: dnsrr - we have no VIP or other IPs for service, thus force service discovery to get task's IPs
-			 * for endpoint_mode: vip - we have VIPs for the service, no need to return IPs for directly bound to nodes ports
 			 */
 			if service.Endpoint.Spec.Mode == "dnsrr" {
 				filter.DiscoverTasks = true
 			}
+			/* for endpoint_mode: vip - we have VIPs for the service, but it available only for overlay networks.
+			 * So for ingress network we can't return any VIPs, only task's IPs bound to nodes might be return.
+			 * For overlay networks return VIPs, no need to return IPs for directly bound to nodes ports
+			 */
+			/*if service.Endpoint.Spec.Mode == "vip" && filter.NetworkOrId == "ingress" {
+				filter.DiscoverTasks = true
+			}*/
 
 			if filter.DiscoverTasks {
 				tasks, err = dockerInspectTasks(dockerHost, service.Spec.Name, tlsConfig, apiVersion)
 				if err != nil {
-					//log.Printf("[debug] error: %v\n", err)
+					//log.Printf("[debug] [error] %v\n", err)
 					continue
 				}
 				targetPorts := []uint16{}
@@ -224,38 +231,62 @@ func dockerGetIpList(dockerHost, domainPrefixOrContainerName string, tlsConfig *
 							if err != nil {
 								return nil, err
 							}
+							ports := targetPorts
+
 							// to swarm external access we need to convert swarm local IP to a node (peer) IP
-							if netAttachments.Network.Spec.Ingress {
-								ingress, err := dockerInspectNetwork(dockerHost, netAttachments.Network.ID, tlsConfig, apiVersion)
+							if netAttachments.Network.Spec.Ingress || netAttachments.Network.Spec.Name == "ingress" {
+								ports = publishedPorts
+								ips := []net.IP{}
+								ingressNet, err := dockerInspectNetwork(dockerHost, netAttachments.Network.ID, tlsConfig, apiVersion)
 								if err != nil {
-									log.Printf("error: %v\n", err)
+									log.Printf("[error] %v\n", err)
 								} else {
-									if ingress.Peers != nil {
-										for _, peer := range ingress.Peers {
+									if ingressNet.Peers != nil {
+										//log.Printf("[debug] dockerGetIpList: ingress network, lookup for peers: %+v\n", ingressNet.Peers)
+										for _, peer := range ingressNet.Peers {
 											pIp := net.ParseIP(peer.IP)
 											if pIp != nil {
-												ip = pIp
+												ips = append(ips, pIp)
 											}
 										}
+									} else {
+										log.Printf("[ warn] dockerGetIpList: ingress network (%q), no peers found\n", netAttachments.Network.ID)
 									}
 								}
+								// remove duplicates
+								isDuplicate := false
+								for _, h := range hosts {
+									if reflect.DeepEqual(h.Ips, ips) && reflect.DeepEqual(h.Ports, ports) {
+										isDuplicate = true
+										break
+									}
+								}
+								if !isDuplicate {
+									hosts = append(hosts, dockerHosts{
+											Name:		strings.Replace(service.Spec.Name, "_", "-", -1),
+											Ips:		ips,
+											Ports:		ports,
+											Network:	Network{
+															Id:      netAttachments.Network.ID,
+															Name:    taskNetworkName,
+															Ingress: netAttachments.Network.Spec.Ingress || netAttachments.Network.Spec.Name == "ingress",
+											},
+									})
+								}
+							} else {
+								hosts = append(hosts, dockerHosts{
+										Name:    strings.Replace(service.Spec.Name, "_", "-", -1),
+										Ips:     []net.IP{ip},
+										Ports:   ports,
+										Slot:    task.Slot,
+										TaskID:  task.ID,
+										Network: Network{
+														Id:      netAttachments.Network.ID,
+														Name:    taskNetworkName,
+														Ingress: netAttachments.Network.Spec.Ingress || netAttachments.Network.Spec.Name == "ingress",
+										},
+								})
 							}
-							ports := targetPorts
-							if netAttachments.Network.Spec.Ingress {
-								ports = publishedPorts
-							}
-							hosts = append(hosts, dockerHosts{
-									Name:        strings.Replace(service.Spec.Name, "_", "-", -1),
-									Ip:          ip,
-									Ports:       ports,
-									Slot:        task.Slot,
-									TasksID:     task.ID,
-									Network:     Network{
-													Id:      netAttachments.Network.ID,
-													Name:    taskNetworkName,
-													Ingress: netAttachments.Network.Spec.Ingress,
-									},
-							})
 						}
 					}
 					// PublishedPort's with PublishMode: "host"
@@ -272,20 +303,18 @@ func dockerGetIpList(dockerHost, domainPrefixOrContainerName string, tlsConfig *
 
 						node, err := dockerInspectNode(dockerHost, task.NodeID, tlsConfig, apiVersion)
 						if err != nil {
-							log.Printf("error: %v\n", err)
+							log.Printf("[error] %v\n", err)
 						} else {
 							//log.Printf("[debug] dockerGetIpList: node %+v\n", node)
 							nodeIp := net.ParseIP(node.Status.Addr)
 							if nodeIp != nil {
 								hosts = append(hosts, dockerHosts{
 										Name:        strings.Replace(service.Spec.Name, "_", "-", -1),
-										Ip:          nodeIp,
+										Ips:         []net.IP{nodeIp},
 										Ports:       ports,
 										Slot:        task.Slot,
-										TasksID:     task.ID,
-										Network:     Network{
-														Name:    "bridge",
-										},
+										TaskID:      task.ID,
+										Network:     Network{ Name: "bridge" },
 								})
 							}
 						}
@@ -296,7 +325,7 @@ func dockerGetIpList(dockerHost, domainPrefixOrContainerName string, tlsConfig *
 
 				nets, err := dockerInspectNetworks(dockerHost, tlsConfig, apiVersion)
 				if err != nil {
-					log.Printf("error: %v\n", err)
+					log.Printf("[error] %v\n", err)
 				}
 
 				hosts := []dockerHosts{}
@@ -305,11 +334,11 @@ func dockerGetIpList(dockerHost, domainPrefixOrContainerName string, tlsConfig *
 						continue
 					}
 					normNetName := ""
-					ingress := false
+					isIngress := false
 					if nets != nil && len(*nets) > 0 {
 						if net, ok := (*nets)[vip.NetworkID]; ok {
 							normNetName =  strings.Replace(net.Name, "_", "-", -1)
-							ingress = net.Ingress
+							isIngress = net.Ingress || net.Name == "ingress"
 
 							if filter.NetworkOrId != "" && normNetName != filter.NetworkOrId && net.Name != filter.NetworkOrId && net.Id != filter.NetworkOrId {
 								//log.Printf("[debug] dockerGetIpList: filtered out network %q: %q (%q)\n", net.Id, net.Name, normNetName)
@@ -322,28 +351,32 @@ func dockerGetIpList(dockerHost, domainPrefixOrContainerName string, tlsConfig *
 					if err != nil {
 						return nil, err
 					}
+					ips := []net.IP{ip}
 
 					// to swarm external access we need to convert swarm local IP to a node (peer) IP
-					if ingress {
+					if isIngress {
 						ingressNet, err := dockerInspectNetwork(dockerHost, vip.NetworkID, tlsConfig, apiVersion)
 						if err != nil {
-							log.Printf("error: %v\n", err)
+							log.Printf("[error] %v\n", err)
 						} else {
 							if ingressNet.Peers != nil {
+								//log.Printf("[debug] dockerGetIpList: ingress network, lookup for peers: %+v\n", ingressNet.Peers)
+								ips = []net.IP{}
 								for _, peer := range ingressNet.Peers {
 									pIp := net.ParseIP(peer.IP)
 									if pIp != nil {
-										ip = pIp
+										ips = append(ips, pIp)
 									}
 								}
+							} else {
+								log.Printf("[ warn] dockerGetIpList: ingress network (%q), no peers found\n", vip.NetworkID)
 							}
 						}
 					}
-
 					hosts = append(hosts, dockerHosts{
-							Name: domainPrefixOrContainerName,
-							Ip: ip,
-							Network: Network{vip.NetworkID, normNetName, ingress, nil},
+							Name:	domainPrefixOrContainerName,
+							Ips:	ips,
+							Network: Network{vip.NetworkID, normNetName, isIngress, nil},
 					})
 				}
 				/* for PublishMode: "host"
@@ -360,29 +393,31 @@ func dockerGetIpList(dockerHost, domainPrefixOrContainerName string, tlsConfig *
 		}
 
 		if swarmNode {
-			return []dockerHosts{dockerHosts{Ip: net.ParseIP(container.Node.IP)}}, nil
+			return []dockerHosts{dockerHosts{Ips: []net.IP{ net.ParseIP(container.Node.IP) } }}, nil
 		}
 
 		hosts := []dockerHosts{}
 		if container.NetworkSettings.IpAddress != "" {
-			hosts = append(hosts, dockerHosts{Ip: net.ParseIP(container.NetworkSettings.IpAddress)})
+			hosts = append(hosts, dockerHosts{Ips: []net.IP{ net.ParseIP(container.NetworkSettings.IpAddress) } })
 		}
 		if container.NetworkSettings.Ip6Address != "" {
-			hosts = append(hosts, dockerHosts{Ip: net.ParseIP(container.NetworkSettings.Ip6Address)})
+			hosts = append(hosts, dockerHosts{Ips: []net.IP{ net.ParseIP(container.NetworkSettings.Ip6Address) } })
 		}
 		for _, network := range container.NetworkSettings.Networks {
 		NextContainerIp:
 			for _, ip := range []string{network.IpAddress, network.Ip6Address} {
 				if ip != "" {
 					parsedIp := net.ParseIP(ip)
-					for _, hosts := range hosts {
-						if parsedIp.Equal(hosts.Ip) {
-							// dedupe
-							continue NextContainerIp
+					for _, host := range hosts {
+						for _, hostIp := range host.Ips {
+							if parsedIp.Equal(hostIp) {
+								// dedupe
+								continue NextContainerIp
+							}
 						}
 						// TODO decide whether this performance hit is actually worth using a set or map structure to dedupe in nearer-constant time
 					}
-					hosts = append(hosts, dockerHosts{Ip: net.ParseIP(ip)})
+					hosts = append(hosts, dockerHosts{Ips: []net.IP{ net.ParseIP(ip) } })
 				}
 			}
 		}
@@ -404,6 +439,7 @@ func dockerDiscoverService(dockerHost, serviceName string, tlsConfig *tls.Config
 
 			service, err = dockerInspectService(dockerHost, serviceName, tlsConfig, apiVersion)
 			if err != nil {
+				//log.Printf("[debug] %v\n", err)
 				// Mightbe this is a FQDN query, extract servicename from FQDN
 				// let's try looking up for a "service[.taskSlot][.taskId][.network]" template
 				if strings.Contains(serviceName, ".") {
@@ -516,13 +552,14 @@ func dockerInspectService(dockerHost, containerName string, tlsConfig *tls.Confi
 	if err != nil {
 		return nil, fmt.Errorf("failed creating request: %v", err)
 	}
+	//log.Printf("[debug] Request: %q\n", req.URL)
 	resp, err := client.Do(req)
 	if err != nil {
 		return nil, fmt.Errorf("failed HTTP request: %v", err)
 	}
 	defer resp.Body.Close()
 	if resp.StatusCode != 200 {
-		return nil, fmt.Errorf("not '200 OK': %v", resp.Status)
+		return nil, fmt.Errorf("not '200 OK': %v for service: %q\n", resp.Status, containerName)
 	}
 	ret := dockerService{}
 	err = json.NewDecoder(resp.Body).Decode(&ret)
@@ -563,14 +600,15 @@ func dockerInspectTasks(dockerHost, serviceName string, tlsConfig *tls.Config, a
 }
 
 func dockerInspectNetworks(dockerHost string, tlsConfig *tls.Config, apiVersion string) (*map[string]Network, error) {
-	//log.Printf("[debug] dockerInspectNetworks: \n")
+	//log.Printf("[debug] dockerInspectNetworks \n")
 	u, err := url.Parse(dockerHost)
 	if err != nil {
 		return nil, fmt.Errorf("failed parsing URL '%s': %v", dockerHost, err)
 	}
 	client := httpClient(u, tlsConfig)
-	// URL: /"+apiVersion+"/networks?filters={"scope":["swarm"]}", nil)
-	req, err := http.NewRequest("GET", u.String()+"/"+apiVersion+"/networks?filters=%7B%22scope%22%3A%5B%22swarm%22%5D%7D", nil)
+	// URL: /"+apiVersion+"/networks?filters={"scope":["swarm"]}", nil) // require v1.9 API
+	//req, err := http.NewRequest("GET", u.String()+"/"+apiVersion+"/networks?filters=%7B%22scope%22%3A%5B%22swarm%22%5D%7D", nil)
+	req, err := http.NewRequest("GET", u.String()+"/"+apiVersion+"/networks", nil)
 	if err != nil {
 		return nil, fmt.Errorf("failed creating request: %v", err)
 	}
@@ -597,7 +635,7 @@ func dockerInspectNetworks(dockerHost string, tlsConfig *tls.Config, apiVersion 
 }
 
 func dockerInspectNetwork(dockerHost string, networkName string, tlsConfig *tls.Config, apiVersion string) (*Network, error) {
-	//log.Printf("[debug] dockerInspectNetwork: networkName %q\n", serviceName)
+	//log.Printf("[debug] dockerInspectNetwork: networkName %q\n", networkName)
 	u, err := url.Parse(dockerHost)
 	if err != nil {
 		return nil, fmt.Errorf("failed parsing URL '%s': %v", dockerHost, err)
@@ -626,7 +664,7 @@ func dockerInspectNetwork(dockerHost string, networkName string, tlsConfig *tls.
  	return &net, nil
 }
 func dockerInspectNode(dockerHost string, nodeName string, tlsConfig *tls.Config, apiVersion string) (*dockerNode, error) {
-	//log.Printf("[debug] dockerInspectNetwork: networkName %q\n", serviceName)
+	//log.Printf("[debug] dockerInspectNetwork: nodeName %q\n", nodeName)
 	u, err := url.Parse(dockerHost)
 	if err != nil {
 		return nil, fmt.Errorf("failed parsing URL '%s': %v", dockerHost, err)

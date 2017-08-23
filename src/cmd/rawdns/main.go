@@ -69,6 +69,8 @@ func main() {
 	configData, err := ioutil.ReadFile(configFile)
 	if err != nil {
 		log.Fatalf("error: unable to read config file %s: %v\n", configFile, err)
+	} else {
+		log.Printf("use the %q config file\n", configFile)
 	}
 	err = json.Unmarshal(configData, &config)
 	if err != nil {
@@ -237,8 +239,8 @@ func handleDockerRequest(domain string, tlsConfig *tls.Config, w dns.ResponseWri
 			//log.Printf("[debug] handleDockerRequest: host %+v\n", host)
 
 			switch {
-			case host.Name != "" && host.TasksID != "" && host.Slot > 0 && host.Network.Name != "":
-				fqdn := fmt.Sprintf("%v-%v.%v.%v.%v", host.Name, host.Slot, host.TasksID, host.Network.Name, domain)
+			case host.Name != "" && host.TaskID != "" && host.Slot > 0 && host.Network.Name != "":
+				fqdn := fmt.Sprintf("%v-%v.%v.%v.%v", host.Name, host.Slot, host.TaskID, host.Network.Name, domain)
 				cname := fmt.Sprintf("%v-%v.%v.%v", host.Name, host.Slot, host.Network.Name, domain)
 				//log.Printf("[debug] handleDockerRequest: FQDN=%q, CNAME=%q\n", fqdn, cname)
 
@@ -250,37 +252,52 @@ func handleDockerRequest(domain string, tlsConfig *tls.Config, w dns.ResponseWri
 						})
 					}
 				}
-				if ip4 := host.Ip.To4(); ip4 != nil {
-					dnsAppend(q, m, &dns.A{
-						Hdr: dns.RR_Header{Name: fqdn, Rrtype: dns.TypeA, Class: q.Qclass, Ttl: 0},
-						A: ip4 })
+				for _, hostIp := range host.Ips {
+					if ip4 := hostIp.To4(); ip4 != nil {
+						dnsAppend(q, m, &dns.A{
+							Hdr: dns.RR_Header{Name: fqdn, Rrtype: dns.TypeA, Class: q.Qclass, Ttl: 0},
+							A: ip4 })
 
-					if (q.Qtype == dns.TypeSRV || q.Qtype == dns.TypeANY) && ! host.Network.Ingress {
-						dnsAppend(q, m, &dns.CNAME{
-							Hdr: dns.RR_Header{Name: cname, Rrtype: dns.TypeCNAME, Class: q.Qclass, Ttl: 0},
-							Target: fqdn })
+						if (q.Qtype == dns.TypeSRV || q.Qtype == dns.TypeANY) && ! host.Network.Ingress {
+							dnsAppend(q, m, &dns.CNAME{
+								Hdr: dns.RR_Header{Name: cname, Rrtype: dns.TypeCNAME, Class: q.Qclass, Ttl: 0},
+								Target: fqdn })
+						}
+					} else {
+						dnsAppend(q, m, &dns.AAAA{
+							Hdr: dns.RR_Header{Name: fqdn, Rrtype: dns.TypeAAAA, Class: q.Qclass, Ttl: 0},
+							AAAA: hostIp})
 					}
-				} else {
-					dnsAppend(q, m, &dns.AAAA{
-						Hdr: dns.RR_Header{Name: fqdn, Rrtype: dns.TypeAAAA, Class: q.Qclass, Ttl: 0},
-						AAAA: host.Ip})
 				}
 			case host.Name != "" && host.Network.Name != "":
 				fqdn := fmt.Sprintf("%v.%v.%v", host.Name, host.Network.Name, domain)
-				if ip4 := host.Ip.To4(); ip4 != nil {
-					dnsAppend(q, m, &dns.A{
-						Hdr: dns.RR_Header{Name: fqdn, Rrtype: dns.TypeA, Class: q.Qclass, Ttl: 0},
-						A: ip4 })
-				} else {
-					dnsAppend(q, m, &dns.AAAA{
-						Hdr: dns.RR_Header{Name: fqdn, Rrtype: dns.TypeAAAA, Class: q.Qclass, Ttl: 0},
-						AAAA: host.Ip})
+
+				if q.Qtype == dns.TypeSRV || q.Qtype == dns.TypeANY {
+					for _, port := range host.Ports {
+						dnsAppend(q, m, &dns.SRV{
+							Port:   port,
+							Target: fqdn,
+						})
+					}
+				}
+				for _, hostIp := range host.Ips {
+					if ip4 := hostIp.To4(); ip4 != nil {
+						dnsAppend(q, m, &dns.A{
+							Hdr: dns.RR_Header{Name: fqdn, Rrtype: dns.TypeA, Class: q.Qclass, Ttl: 0},
+							A: ip4 })
+					} else {
+						dnsAppend(q, m, &dns.AAAA{
+							Hdr: dns.RR_Header{Name: fqdn, Rrtype: dns.TypeAAAA, Class: q.Qclass, Ttl: 0},
+							AAAA: hostIp})
+					}
 				}
 			default:
-				if ip4 := host.Ip.To4(); ip4 != nil {
-					dnsAppend(q, m, &dns.A{A: ip4})
-				} else {
-					dnsAppend(q, m, &dns.AAAA{AAAA: host.Ip})
+				for _, hostIp := range host.Ips {
+					if ip4 := hostIp.To4(); ip4 != nil {
+						dnsAppend(q, m, &dns.A{A: ip4})
+					} else {
+						dnsAppend(q, m, &dns.AAAA{AAAA: hostIp})
+					}
 				}
 			}
 		}

@@ -259,7 +259,7 @@ Lookup for service-name with taskSlot returns service instance IPs for the 1st s
 $ dig +nostats +nocmd +noquestion @localhost rawdns-whoami-1.swarm
 
 ;; ANSWER SECTION:
-rawdns-whoami-1.nw5d54fw6e1k95nv57oqwakrr.ingress.swarm. 0 IN A 192.168.50.115
+rawdns-whoami-1.nw5d54fw6e1k95nv57oqwakrr.ingress.swarm.    0 IN A 192.168.50.115
 rawdns-whoami-1.nw5d54fw6e1k95nv57oqwakrr.rawdns-pub.swarm. 0 IN A 10.0.2.3
 ```
 
@@ -386,5 +386,6 @@ To build run `./build-cross.sh` (on git bash when using windows).
 
 To create a container for testing run
 `docker build -t myaccount/rawdns .`
+`docker build -t stikhonenko/rawdns:latest -t stikhonenko/rawdns:1.7 .`
 and push with
 `docker push myaccount/rawdns:latest`
