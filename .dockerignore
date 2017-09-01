@@ -1,5 +1,8 @@
 *.md
+*.yml
 .git
+.project
+.settings
 .travis.yml
 Dockerfile*
 LICENSE

@@ -1,8 +1,15 @@
+Extension of [tianon/rawdns](https://hub.docker.com/r/tianon/rawdns/) work with service tasks resolving, filtering and initial DNS Service Discovery for Swarm Mode.
+
 # ![rawdns](https://raw.githubusercontent.com/tianon/rawdns/master/logo-black.png)
 
-- [Docker Hub](https://index.docker.io/u/tianon/rawdns/)
-- [GitHub](https://github.com/tianon/rawdns)
-- [![Build Status](https://travis-ci.org/tianon/rawdns.svg)](https://travis-ci.org/tianon/rawdns)
+- Original
+  * [Docker Hub](https://index.docker.io/u/tianon/rawdns/)
+  * [GitHub](https://github.com/tianon/rawdns)
+  * [![Build Status](https://travis-ci.org/tianon/rawdns.svg)](https://travis-ci.org/tianon/rawdns)
+- `swarm-mode` branch:
+  * [Docker Hub](https://index.docker.io/u/stikhonenko/rawdns/)
+  * [GitHub](https://github.com/sergey-tikhonenko/rawdns)
+  * [![Build Status](https://api.travis-ci.org/sergey-tikhonenko/rawdns.svg?branch=swarm-mode)](https://travis-ci.org/sergey-tikhonenko/rawdns)
 
 Save as `/etc/rawdns/config.json`:
 
@@ -83,7 +90,231 @@ PING dns.docker (172.18.0.30) 56(84) bytes of data.
 rtt min/avg/max/mdev = 0.025/0.038/0.049/0.011 ms
 ```
 
-## swarm support
+## swarm mode (Docker 1.12) support
+
+`rawdns` can be used with swarm mode by creating a configuration with the `swarmmode` set to true.  The `swarmnode` option enables `rawdns` to query by service name instead of container name it will return the assigned virtual ip for the service. You can at the same time filter vip, which belong to a given network (use the `networkId` for this).
+
+Example swarm configuration:
+
+```json
+{
+    "swarm.": {
+        "type": "containers",
+        "socket": "unix:///var/run/docker.sock",
+        "swarmmode": true,
+        "networkId": "2zcqib9vlz6fa0gotr525dgcm",
+        "tlsverify": true,
+        "tlscacert": "/var/lib/docker/swarm/certificates/swarm-root-ca.crt",
+        "tlscert": "/var/lib/docker/swarm/certificates/swarm-node.crt",
+        "tlskey": "/var/lib/docker/swarm/certificates/swarm-node.key"
+    },
+    "example.tld.": {
+        "type": "containers",
+        "socket": "unix:///var/run/docker.sock",
+        "swarmmode": true,
+        "networkId": "2zcqib9vlz6fa0gotr525dgcm",
+        "tlsverify": true,
+        "tlscacert": "/var/lib/docker/swarm/certificates/swarm-root-ca.crt",
+        "tlscert": "/var/lib/docker/swarm/certificates/swarm-node.crt",
+        "tlskey": "/var/lib/docker/swarm/certificates/swarm-node.key"
+    },
+    ".": {
+        "type": "forwarding",
+        "nameservers": [ "8.8.8.8", "8.8.4.4" ]
+    }
+}
+```
+
+Example usage:
+
+```shell
+$ docker service create --name dns \
+    --publish 53:53/udp \
+    --mount type=bind,source=/var/run/docker.sock,target=/var/run/docker.sock \
+    --mount type=bind,source=/var/lib/docker/swarm/certificates,target=/var/lib/docker/swarm/certificates \
+    --mount type=bind,source=/etc/rawdns/config.json,target=/etc/rawdns/config.json \
+    tianon/rawdns rawdns /etc/rawdns/config.json
+
+2015/09/14 21:50:49 rawdns v1.2 (go1.4.2 on linux/amd64; gc)
+2015/09/14 21:50:49 listening on domain: .
+2015/09/14 21:50:49 listening on domain: swarm.
+2015/09/14 21:50:49 listening on domain: example.tld.
+```
+
+> NOTE: You need to create the config.json on every swarm member or use `--constraint` to only run on machines with the configuration. Other option is to use [Docker config storage](https://docs.docker.com/engine/swarm/configs/), but it requires v17.06+.
+
+You can now retrieve the vip of the `dns` service (`docker service inspect dns`) and use it like this:
+
+`docker service create --name service-using-dns --dns <vip> --dns-search example.tld myaccount/myservice`
+
+### Swarm mode: tasks lookup
+
+Both service VIP and task ID addresses are supported. Lets look how it works. For diversity we'll use a compose file to get instances up and running.
+
+#### Swarm mode: compose file
+
+Example of compose file:
+
+```yaml
+version: '3.3'
+
+services:
+  dns:
+    image: tianon/rawdns
+    #command: rawdns /etc/rawdns/config.json
+    ports:
+      - "53:53/tcp"
+      - "53:53/udp"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+    #configs:
+    #  - source: rawdns-config
+    #    target: /etc/rawdns/config.json
+    networks:
+      - pub
+
+  whoami:
+    image: emilevauge/whoami
+    hostname: '{{index .Service.Labels "com.docker.stack.namespace"}}-whoami-{{.Task.Slot}}.{{index .Service.Labels "com.docker.stack.namespace"}}-pub.swarm'
+    ports:
+     - "8080:80"
+    networks:
+      - pub
+    deploy:
+      replicas: 2
+
+networks:
+  pub:
+
+#configs:
+#  rawdns-config:
+#    file: ./example-config.json
+```
+
+Deployment command:
+
+```shell
+$ docker stack deploy -c example-stack.yml rawdns
+
+Creating network rawdns_pub
+Creating service rawdns_whoami
+Creating service rawdns_dns
+
+$ docker service logs rawdns_dns
+rawdns_dns.1.yffqfu016mrq@stikhonenko    | 2017/08/02 16:36:30 rawdns v1.6 (go1.7.6 on linux/amd64; gc)
+rawdns_dns.1.yffqfu016mrq@stikhonenko    | 2017/08/02 16:36:30 listening on domain: .
+rawdns_dns.1.yffqfu016mrq@stikhonenko    | 2017/08/02 16:36:30 listening on domain: docker.
+rawdns_dns.1.yffqfu016mrq@stikhonenko    | 2017/08/02 16:36:30 listening on domain: swarm.
+```
+> NOTE: Here is used default `example-config.json` that is packed into `rawdns` image. If you need customize it uncomment and change appropriate lines in the compose file. Also note, that the example compose file uses [`configs`](https://docs.docker.com/engine/swarm/configs/) functionality, that is available only since v17.06.
+
+Lookup service VIP:
+
+```console
+$ dig +nostats +nocmd +noquestion @localhost rawdns-whoami.swarm
+
+;; ANSWER SECTION:
+rawdns_whoami.ingress.swarm.    0 IN    A       192.168.50.115
+rawdns_whoami.rawdns-pub.swarm. 0 IN    A       10.0.2.2
+```
+
+Lookup task IP:
+
+```console
+$ dig +nostats +nocmd +noquestion @localhost rawdns-whoami-1.swarm
+
+;; ANSWER SECTION:
+rawdns-whoami-1.nw5d54fw6e1k95nv57oqwakrr.ingress.swarm. 0 IN A 192.168.50.115
+rawdns-whoami-1.nw5d54fw6e1k95nv57oqwakrr.rawdns-pub.swarm. 0 IN A 10.0.2.3
+```
+
+### Swarm mode: filtering
+
+`rawdns` expects the following pattern to look up service/task: `service[-taskSlot][.taskId][.network]`. Filtering is performed for any optional segments: taskSlot, taskId, network.
+
+During stack deployment a service name is constructed as: `stack-name_service-name`. According [RFC 952](https://tools.ietf.org/html/rfc952) underscore isn't allowed in DNS names. So you can use dash ("-") instead of it to lookup. Both "_" and "-" are supported.
+
+Lookup for service-name returns service VIPs for all available networks:
+
+```console
+$ dig +nostats +nocmd +noquestion @localhost rawdns-whoami.swarm
+
+;; ANSWER SECTION:
+rawdns_whoami.ingress.swarm.    0 IN    A       10.255.0.7
+rawdns_whoami.rawdns-pub.swarm. 0 IN    A       10.0.2.2
+```
+
+Lookup for service-name with networkname returns service VIP only for the "networkname" network:
+
+```console
+$ dig +nostats +nocmd +noquestion @localhost rawdns-whoami.rawdns-pub.swarm
+
+;; ANSWER SECTION:
+rawdns_whoami.rawdns-pub.swarm. 0 IN    A       10.0.2.2
+```
+
+Lookup for service-name with taskSlot returns service instance IPs for the 1st slot and all available networks:
+
+```console
+$ dig +nostats +nocmd +noquestion @localhost rawdns-whoami-1.swarm
+
+;; ANSWER SECTION:
+rawdns-whoami-1.nw5d54fw6e1k95nv57oqwakrr.ingress.swarm.    0 IN A 192.168.50.115
+rawdns-whoami-1.nw5d54fw6e1k95nv57oqwakrr.rawdns-pub.swarm. 0 IN A 10.0.2.3
+```
+
+Lookup for service-name with taskSlot and networkname returns service instance IP for the 1st slot and the "networkname" network:
+
+```console
+$ dig +nostats +nocmd +noquestion @localhost rawdns-whoami-1.rawdns-pub.swarm
+
+;; ANSWER SECTION:
+rawdns-whoami-1.nw5d54fw6e1k95nv57oqwakrr.rawdns-pub.swarm. 0 IN A 10.0.2.3
+```
+
+Dot separation (`service.taskSlot`) is also supported to mimic Docker DNS behavior. By default Docker DNS resolution uses the following names pattern: `stack_service.taskSlot.taskId[.network]`.
+
+```console
+$ dig +nostats +nocmd +noquestion @localhost rawdns_whoami.1.rawdns_pub.swarm
+
+;; ANSWER SECTION:
+rawdns-whoami-1.nw5d54fw6e1k95nv57oqwakrr.rawdns-pub.swarm. 0 IN A 10.0.2.3
+```
+
+```console
+$ dig +nostats +nocmd +noquestion @localhost rawdns_whoami.1.nw5d54fw6e1k95nv57oqwakrr.rawdns_pub.swarm
+
+;; ANSWER SECTION:
+rawdns-whoami-1.nw5d54fw6e1k95nv57oqwakrr.rawdns-pub.swarm. 0 IN A 10.0.2.3
+```
+
+### Swarm mode: DNS Service Discovery (DNS-SD) support
+
+The [DNS Service Discovery](http://www.dns-sd.org/) specification has been developed to configure named instances of a service type and support multiple host and port combination for any service. In addition, it supports of the configuration of meta data for a specific service instance.
+
+DNS-SD combines SRV, PTR, and TXT resource records for service lookup in the following way:
+
+* PTR - used to map service types to named service instances.
+* SRV - used to provide location and port for service instances.
+* TXT - used to provide additional meta data about service instances.
+
+`rawdns` has limited support of DNS-SD. It can inspect service tasks to construct SRV records. DNS query types SRV or ANY switch on the service discovery. `rawdns` also supports the "tasks" prefix to mimics Docker DNS behaviour: `tasks.servicename[.domain]`
+
+```console
+$ dig +nostats +nocmd +noquestion @localhost rawdns-whoami.rawdns-pub.swarm SRV
+
+;; ANSWER SECTION:
+rawdns-whoami.rawdns-pub.swarm.   0 IN  SRV     0 0 80 rawdns-whoami-1.nw5d54fw6e1k95nv57oqwakrr.rawdns-pub.swarm.
+rawdns-whoami.rawdns-pub.swarm.   0 IN  SRV     0 0 80 rawdns-whoami-2.eefjiqynai78hk57lbkozvaz4.rawdns-pub.swarm.
+rawdns-whoami-1.rawdns-pub.swarm. 0 IN  CNAME   rawdns-whoami-1.nw5d54fw6e1k95nv57oqwakrr.rawdns-pub.swarm.
+rawdns-whoami-2.rawdns-pub.swarm. 0 IN  CNAME   rawdns-whoami-2.eefjiqynai78hk57lbkozvaz4.rawdns-pub.swarm.
+
+;; ADDITIONAL SECTION:
+rawdns-whoami-1.nw5d54fw6e1k95nv57oqwakrr.rawdns-pub.swarm. 0 IN A 10.0.2.3
+rawdns-whoami-2.eefjiqynai78hk57lbkozvaz4.rawdns-pub.swarm. 0 IN A 10.0.2.4
+```
+
+## swarm (legacy) support
 
 `rawdns` can be used with swarm by creating a configuration that provides the socket details using the `tcp://` scheme.  You will also need to enable `swarmnode` by setting it to true.  The `swarmnode` option enables `rawdns` to look at the `Node` section of the inspect API response for the external/host IP address.
 
@@ -147,3 +378,14 @@ root@69967c3e5179:/# ping dns.docker
 PING dns.docker (172.17.0.85): 56 data bytes
 64 bytes from 172.17.0.85: icmp_seq=0 ttl=64 time=0.076 ms
 ```
+
+
+## Development / Contributing
+
+To build run `./build-cross.sh` (on git bash when using windows).
+
+To create a container for testing run
+`docker build -t myaccount/rawdns .`
+`docker build -t stikhonenko/rawdns:latest -t stikhonenko/rawdns:1.7 .`
+and push with
+`docker push myaccount/rawdns:latest`
