@@ -374,7 +374,7 @@ func dockerGetIpList(dockerHost, domainPrefixOrContainerName string, tlsConfig *
 						}
 					}
 					hosts = append(hosts, dockerHosts{
-							Name:	domainPrefixOrContainerName,
+							Name:	strings.Replace(service.Spec.Name, "_", "-", -1),
 							Ips:	ips,
 							Network: Network{vip.NetworkID, normNetName, isIngress, nil},
 					})

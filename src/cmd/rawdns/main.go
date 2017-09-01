@@ -252,6 +252,11 @@ func handleDockerRequest(domain string, tlsConfig *tls.Config, w dns.ResponseWri
 						})
 					}
 				}
+				if name != fqdn {
+					dnsAppend(q, m, &dns.CNAME{
+						Hdr: dns.RR_Header{Name: name, Rrtype: dns.TypeCNAME, Class: q.Qclass, Ttl: 0},
+						Target: fqdn })
+				}
 				for _, hostIp := range host.Ips {
 					if ip4 := hostIp.To4(); ip4 != nil {
 						dnsAppend(q, m, &dns.A{
@@ -271,7 +276,13 @@ func handleDockerRequest(domain string, tlsConfig *tls.Config, w dns.ResponseWri
 				}
 			case host.Name != "" && host.Network.Name != "":
 				fqdn := fmt.Sprintf("%v.%v.%v", host.Name, host.Network.Name, domain)
+				//log.Printf("[debug] handleDockerRequest: FQDN=%q\n", fqdn)
 
+				if name != fqdn {
+					dnsAppend(q, m, &dns.CNAME{
+						Hdr: dns.RR_Header{Name: name, Rrtype: dns.TypeCNAME, Class: q.Qclass, Ttl: 0},
+						Target: fqdn })
+				}
 				if q.Qtype == dns.TypeSRV || q.Qtype == dns.TypeANY {
 					for _, port := range host.Ports {
 						dnsAppend(q, m, &dns.SRV{
