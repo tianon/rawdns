@@ -1,4 +1,4 @@
-FROM golang:1.9-alpine
+FROM golang:1.9-alpine3.7
 
 RUN apk add --no-cache ca-certificates openssl
 
