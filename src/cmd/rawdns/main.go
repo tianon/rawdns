@@ -203,6 +203,7 @@ func handleDockerRequest(domain string, tlsConfig *tls.Config, w dns.ResponseWri
 			ips, err = dockerGetIpList(config[domain].Socket, linkedContainerName, tlsConfig, config[domain].SwarmNode)
 		}
 		if err != nil {
+			m.SetRcode(r, dns.RcodeNameError)
 			log.Printf("error: failed to lookup container %q: %v\n", containerName, err)
 			return
 		}
