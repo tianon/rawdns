@@ -1,9 +1,11 @@
-FROM golang:1.9-alpine3.7
+FROM golang:1.11-alpine3.8
 
 # disable CGO for ALL THE THINGS (to help ensure no libc)
 ENV CGO_ENABLED 0
 
-ENV BUILD_FLAGS="-v -ldflags '-d -s -w' -a -tags netgo -installsuffix netgo"
+ENV GOFLAGS="-v -a -tags=netgo -installsuffix=netgo"
+# https://go-review.googlesource.com/c/go/+/126656#message-7c4d6ca064ec7fa35ce68e057bbb29a62186b714
+ENV BUILD_FLAGS="-ldflags '-d -s -w'"
 
 ENV GOPATH $GOPATH:/go/src/github.com/tianon/rawdns/vendor
 COPY . /go/src/github.com/tianon/rawdns
