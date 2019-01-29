@@ -83,7 +83,64 @@ PING dns.docker (172.18.0.30) 56(84) bytes of data.
 rtt min/avg/max/mdev = 0.025/0.038/0.049/0.011 ms
 ```
 
-## swarm support
+## swarm mode (Docker 1.12) support
+
+`rawdns` can be used with swarm mode by creating a configuration with the `swarmmode` set to true.  The `swarmnode` option enables `rawdns` to query by service name instead of container name it will return the assigned virtual ip for the service. You can at the same time filter vip, which belong to a given network (use the `networkId` for this).
+
+Example swarm configuration:
+
+```json
+{
+    "swarm.": {
+        "type": "containers",
+        "socket": "unix:///var/run/docker.sock",
+        "swarmmode": true,
+        "networkId": "2zcqib9vlz6fa0gotr525dgcm",
+        "tlsverify": true,
+        "tlscacert": "/var/lib/docker/swarm/certificates/swarm-root-ca.crt",
+        "tlscert": "/var/lib/docker/swarm/certificates/swarm-node.crt",
+        "tlskey": "/var/lib/docker/swarm/certificates/swarm-node.key"
+    },
+    "example.tld.": {
+        "type": "containers",
+        "socket": "unix:///var/run/docker.sock",
+        "swarmmode": true,
+        "networkId": "2zcqib9vlz6fa0gotr525dgcm",
+        "tlsverify": true,
+        "tlscacert": "/var/lib/docker/swarm/certificates/swarm-root-ca.crt",
+        "tlscert": "/var/lib/docker/swarm/certificates/swarm-node.crt",
+        "tlskey": "/var/lib/docker/swarm/certificates/swarm-node.key"
+    },
+    ".": {
+        "type": "forwarding",
+        "nameservers": [ "8.8.8.8", "8.8.4.4" ]
+    }
+}
+```
+
+Example usage:
+
+```shell
+$ docker service create --name dns \
+    --publish 53:53/udp \
+    --mount type=bind,source=/var/run/docker.sock,target=/var/run/docker.sock \
+    --mount type=bind,source=/var/lib/docker/swarm/certificates,target=/var/lib/docker/swarm/certificates \
+    --mount type=bind,source=/etc/rawdns/config.json,target=/etc/rawdns/config.json \
+    tianon/rawdns rawdns /etc/rawdns/config.json
+
+2015/09/14 21:50:49 rawdns v1.2 (go1.4.2 on linux/amd64; gc)
+2015/09/14 21:50:49 listening on domain: .
+2015/09/14 21:50:49 listening on domain: swarm.
+2015/09/14 21:50:49 listening on domain: example.tld.
+```
+
+> NOTE: You need to create the config.json on every swarm member or use `--constraint` to only run on machines with the configuration.
+
+You can now retrieve the vip of the `dns` service (`docker service inspect dns`) and use it like this:
+
+`docker service create --name service-using-dns --dns <vip> --dns-search example.tld myaccount/myservice`
+
+## swarm (legacy) support
 
 `rawdns` can be used with swarm by creating a configuration that provides the socket details using the `tcp://` scheme.  You will also need to enable `swarmnode` by setting it to true.  The `swarmnode` option enables `rawdns` to look at the `Node` section of the inspect API response for the external/host IP address.
 
@@ -147,3 +204,13 @@ root@69967c3e5179:/# ping dns.docker
 PING dns.docker (172.17.0.85): 56 data bytes
 64 bytes from 172.17.0.85: icmp_seq=0 ttl=64 time=0.076 ms
 ```
+
+
+## Development / Contributing
+
+To build run `./build-cross.sh` (on git bash when using windows).
+
+To create a container for testing run
+`docker build -t myaccount/rawdns .`
+and push with
+`docker push myaccount/rawdns:latest`
