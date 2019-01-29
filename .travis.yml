@@ -1,27 +1,27 @@
 language: go
 
 go:
+  - 1.9.x
   - 1.8.x
   - 1.7.x
-  - 1.6.x
 env:
   - GIMME_ARCH=amd64
   - GIMME_ARCH=386
 matrix:
   include:
-    - go: 1.7.x
+    - go: 1.9.x
       env: GIMME_ARCH=arm GOARM=5
-    - go: 1.7.x
+    - go: 1.9.x
       env: GIMME_ARCH=arm GOARM=6
-    - go: 1.7.x
+    - go: 1.9.x
       env: GIMME_ARCH=arm GOARM=7
-    - go: 1.7.x
+    - go: 1.9.x
       env: GIMME_ARCH=arm64
-    - go: 1.7.x
+    - go: 1.9.x
       env: GIMME_ARCH=ppc64
-    - go: 1.7.x
+    - go: 1.9.x
       env: GIMME_ARCH=ppc64le
-    - go: 1.7.x
+    - go: 1.9.x
       env: GIMME_ARCH=s390x
 
 install:

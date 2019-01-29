@@ -209,6 +209,7 @@ func handleDockerRequest(domain string, tlsConfig *tls.Config, w dns.ResponseWri
 			ips, err = dockerGetIpList(config[domain].Socket, linkedContainerName, tlsConfig, config[domain].SwarmNode, config[domain].SwarmMode, config[domain].NetworkID)
 		}
 		if err != nil {
+			m.SetRcode(r, dns.RcodeNameError)
 			log.Printf("error: failed to lookup domain prefix %q: %v\n", domainPrefix, err)
 			return
 		}

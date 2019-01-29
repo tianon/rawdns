@@ -1,8 +1,8 @@
-FROM alpine:3.5
+FROM alpine:3.8
 
 WORKDIR /etc/rawdns
 
-ENV RAWDNS_VERSION 1.6
+ENV RAWDNS_VERSION 1.7
 
 RUN set -ex; \
 	\
