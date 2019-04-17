@@ -1,4 +1,4 @@
-FROM golang:1.11-alpine3.8
+FROM golang:1.11-alpine3.9
 
 # disable CGO for ALL THE THINGS (to help ensure no libc)
 ENV CGO_ENABLED 0
