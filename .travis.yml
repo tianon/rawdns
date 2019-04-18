@@ -1,34 +1,9 @@
 language: go
 
 go:
-  - 1.9.x
-  - 1.8.x
-  - 1.7.x
-env:
-  - GIMME_ARCH=amd64
-  - GIMME_ARCH=386
-matrix:
-  include:
-    - go: 1.9.x
-      env: GIMME_ARCH=arm GOARM=5
-    - go: 1.9.x
-      env: GIMME_ARCH=arm GOARM=6
-    - go: 1.9.x
-      env: GIMME_ARCH=arm GOARM=7
-    - go: 1.9.x
-      env: GIMME_ARCH=arm64
-    - go: 1.9.x
-      env: GIMME_ARCH=ppc64
-    - go: 1.9.x
-      env: GIMME_ARCH=ppc64le
-    - go: 1.9.x
-      env: GIMME_ARCH=s390x
-
-install:
-  - export GOPATH="$PWD/src:$PWD/vendor"
-  - cd src
+  - 1.12.x
 
 script:
-  - go build -v ./...
+  - go build -mod vendor -v ./cmd/rawdns
 
 # vim:set et ts=2 sw=2:
