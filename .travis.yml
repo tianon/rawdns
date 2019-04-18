@@ -7,7 +7,7 @@ os:
   - linux
   - windows
 
-install: GO111MODULE=on go build -mod vendor -v ./cmd/rawdns -o rawdns
+install: GO111MODULE=on go build -mod vendor -v -o rawdns ./cmd/rawdns
 
 script: file ./rawdns
 
