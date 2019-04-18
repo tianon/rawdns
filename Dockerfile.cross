@@ -1,15 +1,17 @@
-FROM golang:1.11-alpine3.9
+FROM golang:1.12-alpine3.9
+
+# trust, but verify
+RUN [ -z "$(ls -A1 /go/bin || :)" ]
 
 # disable CGO for ALL THE THINGS (to help ensure no libc)
 ENV CGO_ENABLED 0
 
-ENV GOFLAGS="-v -a -tags=netgo -installsuffix=netgo"
+ENV GOFLAGS="-v -a -tags=netgo -installsuffix=netgo -mod=vendor"
 # https://go-review.googlesource.com/c/go/+/126656#message-7c4d6ca064ec7fa35ce68e057bbb29a62186b714
 ENV BUILD_FLAGS="-ldflags '-d -s -w'"
 
-ENV GOPATH $GOPATH:/go/src/github.com/tianon/rawdns/vendor
-COPY . /go/src/github.com/tianon/rawdns
-WORKDIR /go/src/github.com/tianon/rawdns/src/cmd/rawdns
+COPY . /usr/local/src/rawdns
+WORKDIR /usr/local/src/rawdns/cmd/rawdns
 
 # rawdns-$(dpkg --print-architecture)
 RUN set -x \

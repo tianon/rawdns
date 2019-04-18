@@ -1,21 +1,9 @@
-FROM golang:1.11-alpine3.9
+FROM golang:1.12-alpine3.9
 
 RUN apk add --no-cache ca-certificates openssl
 
-ENV GB_VERSION 0.4.2
-RUN set -x \
-	&& mkdir -p /go/src/github.com/constabulary \
-	&& cd /go/src/github.com/constabulary \
-	&& wget -qO- "https://github.com/constabulary/gb/archive/v${GB_VERSION}.tar.gz" \
-		| tar -xz \
-	&& mv gb-* gb \
-	&& cd gb \
-	&& go install -v ./...
-
-WORKDIR /usr/src/rawdns
-ENV PATH /usr/src/rawdns/bin:$PATH
-
+WORKDIR /usr/local/src/rawdns
 COPY . .
-RUN gb build -ldflags '-s -w'
+RUN go build -v -mod vendor -o /usr/local/bin/rawdns ./cmd/rawdns
 
 CMD ["rawdns"]
