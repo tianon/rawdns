@@ -1,1 +1,1 @@
-src/cmd/rawdns/version.go
+cmd/rawdns/version.go
