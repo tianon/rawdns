@@ -19,7 +19,7 @@ RUN set -ex; \
 	\
 #	export GNUPGHOME="$(mktemp -d)"; \
 ## gpg: key BF357DD4: public key "Tianon Gravi <tianon@tianon.xyz>" imported
-#	gpg --batch --keyserver keys.openpgp.org --recv-keys B42F6819007F00F88E364FD4036A9C25BF357DD4; \
+#	gpg --batch --keyserver hkps://keys.openpgp.org --recv-keys B42F6819007F00F88E364FD4036A9C25BF357DD4; \
 #	gpg --batch --verify /usr/local/bin/rawdns.asc /usr/local/bin/rawdns; \
 #	gpgconf --kill all; \
 #	rm -r "$GNUPGHOME" /usr/local/bin/rawdns.asc; \
