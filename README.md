@@ -2,7 +2,7 @@
 
 - [Docker Hub](https://index.docker.io/u/tianon/rawdns/)
 - [GitHub](https://github.com/tianon/rawdns)
-- [![Build Status](https://travis-ci.org/tianon/rawdns.svg)](https://travis-ci.org/tianon/rawdns)
+- [![Smoke Test](https://github.com/tianon/rawdns/workflows/Smoke%20Test/badge.svg?branch=master)](https://github.com/tianon/rawdns/actions?query=workflow%3A%22Smoke+Test%22+branch%3Amaster)
 
 Save as `/etc/rawdns/config.json`:
 
