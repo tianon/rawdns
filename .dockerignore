@@ -1,6 +1,6 @@
 *.md
 .git
-.travis.yml
+.github
 Dockerfile*
 LICENSE
 bin
