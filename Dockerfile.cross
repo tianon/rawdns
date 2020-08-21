@@ -1,4 +1,4 @@
-FROM golang:1.13-alpine3.11
+FROM golang:1.14-alpine3.12
 
 # trust, but verify
 RUN [ -z "$(ls -A1 /go/bin || :)" ]
@@ -31,6 +31,8 @@ RUN set -x \
 	&& eval "GOARCH=mips64le go build $BUILD_FLAGS -o /go/bin/rawdns-mips64el"
 RUN set -x \
 	&& eval "GOARCH=ppc64le go build $BUILD_FLAGS -o /go/bin/rawdns-ppc64el"
+RUN set -x \
+	&& eval "GOARCH=riscv64 go build $BUILD_FLAGS -o /go/bin/rawdns-riscv64"
 RUN set -x \
 	&& eval "GOARCH=s390x go build $BUILD_FLAGS -o /go/bin/rawdns-s390x"
 
