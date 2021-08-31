@@ -35,6 +35,7 @@ type DomainConfig struct {
 
 	// "type": "forwarding"
 	Nameservers []string `json:"nameservers"` // [ "8.8.8.8", "8.8.4.4" ]
+	Randomize   *bool    `json:"randomize"`   // whether to randomize recursive lookups to spread upstream load (defaults to true)
 
 	// "type": "static"
 	Addrs  []string          `json:"addrs"`
@@ -74,6 +75,13 @@ func main() {
 	}
 
 	for domain := range config {
+		if config[domain].Randomize == nil {
+			domainConfig := config[domain]
+			randomize := true
+			domainConfig.Randomize = &randomize
+			config[domain] = domainConfig
+		}
+
 		switch config[domain].Type {
 		case "containers":
 			// TODO there must be a better way to pass "domain" along without an anonymous function AND copied variable
@@ -93,8 +101,9 @@ func main() {
 		case "forwarding":
 			// TODO there must be a better way to pass "domain" along without an anonymous function AND copied variable
 			nameservers := config[domain].Nameservers
+			randomize := *config[domain].Randomize
 			dns.HandleFunc(domain, func(w dns.ResponseWriter, r *dns.Msg) {
-				handleForwarding(nameservers, w, r)
+				handleForwarding(nameservers, randomize, w, r)
 			})
 		case "static":
 			cCopy := config[domain]
@@ -252,7 +261,7 @@ func handleStaticRequest(config DomainConfig, w dns.ResponseWriter, r *dns.Msg) 
 					},
 					Question: []dns.Question{recQ},
 				}
-				recM := handleForwardingRaw(config.Nameservers, recR, w.RemoteAddr())
+				recM := handleForwardingRaw(config.Nameservers, *config.Randomize, recR, w.RemoteAddr())
 				for _, rr := range recM.Answer {
 					dnsAppend(recQ, m, rr)
 				}

@@ -15,7 +15,7 @@ import (
 	"github.com/miekg/dns"
 )
 
-func handleForwardingRaw(nameservers []string, req *dns.Msg, remote net.Addr) *dns.Msg {
+func handleForwardingRaw(nameservers []string, randomize bool, req *dns.Msg, remote net.Addr) *dns.Msg {
 	if len(nameservers) == 0 {
 		log.Printf("no nameservers defined, can not forward\n")
 		m := new(dns.Msg)
@@ -31,13 +31,17 @@ func handleForwardingRaw(nameservers []string, req *dns.Msg, remote net.Addr) *d
 		tcp = true
 	}
 
+	nsid := 0
+	if randomize {
+		// Use request Id for "random" nameserver selection.
+		nsid = int(req.Id) % len(nameservers)
+	}
+
 	var (
 		r   *dns.Msg
 		err error
 		try int
 	)
-	// Use request Id for "random" nameserver selection.
-	nsid := int(req.Id) % len(nameservers)
 	dnsClient := &dns.Client{Net: "udp", Timeout: 4 * time.Second, SingleInflight: true}
 	if tcp {
 		dnsClient.Net = "tcp"
@@ -68,6 +72,6 @@ Redo:
 }
 
 // ServeDNSForward forwards a request to a nameservers and returns the response.
-func handleForwarding(nameservers []string, w dns.ResponseWriter, req *dns.Msg) {
-	w.WriteMsg(handleForwardingRaw(nameservers, req, w.RemoteAddr()))
+func handleForwarding(nameservers []string, randomize bool, w dns.ResponseWriter, req *dns.Msg) {
+	w.WriteMsg(handleForwardingRaw(nameservers, randomize, req, w.RemoteAddr()))
 }
