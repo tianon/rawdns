@@ -3,7 +3,6 @@ package main
 import (
 	"crypto/tls"
 	"crypto/x509"
-	"encoding/json"
 	"fmt"
 	"io/ioutil"
 	"log"
@@ -14,6 +13,7 @@ import (
 	"strings"
 
 	"github.com/miekg/dns"
+	"github.com/titanous/json5"
 )
 
 type Config map[string]DomainConfig // { "docker.": { ... }, ".": { ... } }
@@ -69,7 +69,7 @@ func main() {
 	if err != nil {
 		log.Fatalf("error: unable to read config file %s: %v\n", configFile, err)
 	}
-	err = json.Unmarshal(configData, &config)
+	err = json5.Unmarshal(configData, &config)
 	if err != nil {
 		log.Fatalf("error: unable to process config file data from %s: %v\n", configFile, err)
 	}
