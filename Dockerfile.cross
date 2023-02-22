@@ -8,7 +8,8 @@ ENV CGO_ENABLED 0
 
 ENV GOFLAGS="-v -a -tags=netgo -installsuffix=netgo"
 # https://golang.org/issue/26849
-ENV BUILD_FLAGS="-ldflags '-d -s -w' ./cmd/rawdns"
+ENV BUILD_FLAGS="-ldflags '-d -w' ./cmd/rawdns"
+# intentionally *not* including "-s" so that we can run "govulncheck" on the result (minor size increase)
 
 WORKDIR /usr/local/src/rawdns
 
