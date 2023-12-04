@@ -11,11 +11,14 @@ import (
 
 var (
 	dockerApiVersions = []string{
+		// https://github.com/moby/moby/pull/46887
+		"v1.41", // Docker 20.10.x
+
 		// libnetwork doesn't provide "Networks" until at least API version 1.21
-		"v1.21",
+		"v1.21", // Docker 1.9.x
 
 		// we'll fallback here, for maximum compatibility
-		"v1.16",
+		"v1.16", // Docker 1.4.x
 	}
 )
 
