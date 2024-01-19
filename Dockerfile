@@ -11,6 +11,6 @@ RUN set -eux; \
 
 COPY . .
 
-RUN go build -v -o /usr/local/bin/rawdns ./cmd/rawdns
+RUN go build -v -trimpath -o /usr/local/bin/rawdns ./cmd/rawdns
 
 CMD ["rawdns"]

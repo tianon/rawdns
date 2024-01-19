@@ -6,7 +6,7 @@ RUN [ -z "$(ls -A1 /go/bin || :)" ]
 # disable CGO for ALL THE THINGS (to help ensure no libc)
 ENV CGO_ENABLED 0
 
-ENV GOFLAGS="-v -a -tags=netgo -installsuffix=netgo"
+ENV GOFLAGS="-v -a -trimpath"
 # https://golang.org/issue/26849
 ENV BUILD_FLAGS="-ldflags '-d -w' ./cmd/rawdns"
 # intentionally *not* including "-s" so that we can run "govulncheck" on the result (minor size increase)
