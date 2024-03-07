@@ -40,11 +40,13 @@ type DomainConfig struct {
 	// "type": "static"
 	Addrs  []string          `json:"addrs"`
 	Cnames []string          `json:"cnames"`
+	Ptrs   []string          `json:"ptrs"`
 	Txts   [][]string        `json:"txts"`
 	Srvs   []DomainConfigSrv `json:"srvs"`
 	// pre-calculated/parsed
 	addrs  []net.IP   // net.ParseIP(Addrs)
 	cnames []string   // dns.Fqdn(Cnames)
+	ptrs   []string   // dns.Fqdn(Ptrs)
 	txts   [][]string // strings.Replace(Txts, `\`, `\\`, -1)
 }
 
@@ -118,6 +120,11 @@ func main() {
 				cCopy.cnames[i] = dns.Fqdn(cname)
 			}
 
+			cCopy.ptrs = make([]string, len(cCopy.Ptrs))
+			for i, ptr := range cCopy.Ptrs {
+				cCopy.ptrs[i] = dns.Fqdn(ptr)
+			}
+
 			cCopy.txts = make([][]string, len(cCopy.Txts))
 			for i, txts := range cCopy.Txts {
 				cCopy.txts[i] = make([]string, len(txts))
@@ -168,6 +175,9 @@ func dnsAppend(q dns.Question, m *dns.Msg, rr dns.RR) {
 		rrS.Hdr = hdr
 	} else if rrS, ok := rr.(*dns.CNAME); ok {
 		hdr.Rrtype = dns.TypeCNAME
+		rrS.Hdr = hdr
+	} else if rrS, ok := rr.(*dns.PTR); ok {
+		hdr.Rrtype = dns.TypePTR
 		rrS.Hdr = hdr
 	} else if rrS, ok := rr.(*dns.TXT); ok {
 		hdr.Rrtype = dns.TypeTXT
@@ -269,6 +279,10 @@ func handleStaticRequest(config DomainConfig, w dns.ResponseWriter, r *dns.Msg) 
 					dnsAppend(recQ, m, rr)
 				}
 			}
+		}
+
+		for _, ptr := range config.ptrs {
+			dnsAppend(q, m, &dns.PTR{Ptr: ptr})
 		}
 
 		for _, txt := range config.txts {
