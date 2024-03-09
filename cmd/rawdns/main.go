@@ -3,6 +3,7 @@ package main
 import (
 	"crypto/tls"
 	"crypto/x509"
+	"encoding/json"
 	"fmt"
 	"io/ioutil"
 	"log"
@@ -10,13 +11,15 @@ import (
 	"os"
 	"os/signal"
 	"runtime"
+	"slices"
 	"strings"
 
+	"github.com/docker-library/meta-scripts/om"
 	"github.com/miekg/dns"
 	"github.com/titanous/json5"
 )
 
-type Config map[string]DomainConfig // { "docker.": { ... }, ".": { ... } }
+// config like { "docker.": { ... }, ".": { ... } }
 
 type DomainConfig struct {
 	Type string `json:"type"` // "containers", "forwarding", "static"
@@ -29,6 +32,8 @@ type DomainConfig struct {
 	TLSCACert string `json:"tlscacert"`
 	TLSCert   string `json:"tlscert"`
 	TLSKey    string `json:"tlskey"`
+	// parsed/loaded
+	tlsConfig *tls.Config
 
 	// IP address strategy
 	SwarmNode bool `json:"swarmnode"`
@@ -57,8 +62,6 @@ type DomainConfigSrv struct {
 	Target   string `json:"target"`
 }
 
-var config Config
-
 func main() {
 	log.Printf("rawdns v%s (%s on %s/%s; %s)\n", VERSION, runtime.Version(), runtime.GOOS, runtime.GOARCH, runtime.Compiler)
 
@@ -71,76 +74,85 @@ func main() {
 	if err != nil {
 		log.Fatalf("error: unable to read config file %s: %v\n", configFile, err)
 	}
-	err = json5.Unmarshal(configData, &config)
-	if err != nil {
-		log.Fatalf("error: unable to process config file data from %s: %v\n", configFile, err)
+
+	config := om.OrderedMap[DomainConfig]{}
+	if err := json.Unmarshal(configData, &config); err != nil {
+		// if it isn't stock JSON, it might be json5; we'll try that (for backwards compatibility)
+		var configMap map[string]DomainConfig
+		if err5 := json5.Unmarshal(configData, &configMap); err5 != nil {
+			log.Fatalf("error: unable to process config file data from %s: %v\n", configFile, err)
+		}
+		domains := make([]string, 0, len(configMap))
+		for domain := range configMap {
+			domains = append(domains, domain)
+		}
+		slices.Sort(domains)
+		for _, domain := range domains {
+			config.Set(domain, configMap[domain])
+		}
 	}
 
-	for domain := range config {
-		if config[domain].Randomize == nil {
-			domainConfig := config[domain]
+	for _, domain := range config.Keys() {
+		domain := domain // https://github.com/golang/go/discussions/56010
+		domainConfig := config.Get(domain)
+
+		if domainConfig.Randomize == nil {
 			randomize := true
 			domainConfig.Randomize = &randomize
-			config[domain] = domainConfig
 		}
 
-		switch config[domain].Type {
+		switch domainConfig.Type {
 		case "containers":
-			// TODO there must be a better way to pass "domain" along without an anonymous function AND copied variable
-			var tlsConfig *tls.Config
-			if config[domain].TLSCert != "" && config[domain].TLSKey != "" {
+			if domainConfig.TLSCert != "" && domainConfig.TLSKey != "" {
 				var err error
-				tlsConfig, err = loadTLSConfig(config[domain].TLSCACert, config[domain].TLSCert, config[domain].TLSKey, config[domain].TLSVerify)
+				domainConfig.tlsConfig, err = loadTLSConfig(domainConfig.TLSCACert, domainConfig.TLSCert, domainConfig.TLSKey, domainConfig.TLSVerify)
 				if err != nil {
 					log.Fatalf("error: Unable to load tls config for %s: %s\n", domain, err)
 				}
 			}
 
-			dCopy := domain
-			dns.HandleFunc(dCopy, func(w dns.ResponseWriter, r *dns.Msg) {
-				handleDockerRequest(dCopy, tlsConfig, w, r)
-			})
-		case "forwarding":
-			// TODO there must be a better way to pass "domain" along without an anonymous function AND copied variable
-			nameservers := config[domain].Nameservers
-			randomize := *config[domain].Randomize
 			dns.HandleFunc(domain, func(w dns.ResponseWriter, r *dns.Msg) {
-				handleForwarding(nameservers, randomize, w, r)
+				handleDockerRequest(domain, domainConfig, w, r)
 			})
+
+		case "forwarding":
+			dns.HandleFunc(domain, func(w dns.ResponseWriter, r *dns.Msg) {
+				handleForwarding(domainConfig.Nameservers, *domainConfig.Randomize, w, r)
+			})
+
 		case "static":
-			cCopy := config[domain]
-
-			cCopy.addrs = make([]net.IP, len(cCopy.Addrs))
-			for i, addr := range cCopy.Addrs {
-				cCopy.addrs[i] = net.ParseIP(addr)
+			domainConfig.addrs = make([]net.IP, len(domainConfig.Addrs))
+			for i, addr := range domainConfig.Addrs {
+				domainConfig.addrs[i] = net.ParseIP(addr)
 			}
 
-			cCopy.cnames = make([]string, len(cCopy.Cnames))
-			for i, cname := range cCopy.Cnames {
-				cCopy.cnames[i] = dns.Fqdn(cname)
+			domainConfig.cnames = make([]string, len(domainConfig.Cnames))
+			for i, cname := range domainConfig.Cnames {
+				domainConfig.cnames[i] = dns.Fqdn(cname)
 			}
 
-			cCopy.ptrs = make([]string, len(cCopy.Ptrs))
-			for i, ptr := range cCopy.Ptrs {
-				cCopy.ptrs[i] = dns.Fqdn(ptr)
+			domainConfig.ptrs = make([]string, len(domainConfig.Ptrs))
+			for i, ptr := range domainConfig.Ptrs {
+				domainConfig.ptrs[i] = dns.Fqdn(ptr)
 			}
 
-			cCopy.txts = make([][]string, len(cCopy.Txts))
-			for i, txts := range cCopy.Txts {
-				cCopy.txts[i] = make([]string, len(txts))
+			domainConfig.txts = make([][]string, len(domainConfig.Txts))
+			for i, txts := range domainConfig.Txts {
+				domainConfig.txts[i] = make([]string, len(txts))
 				for j, txt := range txts {
-					cCopy.txts[i][j] = strings.Replace(txt, `\`, `\\`, -1)
+					domainConfig.txts[i][j] = strings.Replace(txt, `\`, `\\`, -1)
 				}
 			}
 
 			dns.HandleFunc(domain, func(w dns.ResponseWriter, r *dns.Msg) {
-				handleStaticRequest(cCopy, w, r)
+				handleStaticRequest(domainConfig, w, r)
 			})
+
 		default:
-			log.Printf("error: unknown domain type on %s: %q\n", domain, config[domain].Type)
-			continue
+			log.Fatalf("error: unknown domain type on %s: %q\n", domain, domainConfig.Type)
 		}
-		log.Printf("listening on domain: %s\n", domain)
+
+		log.Printf("listening on domain [% -10s]: %s\n", domainConfig.Type, domain)
 	}
 
 	go serve("tcp", ":53")
@@ -197,7 +209,7 @@ func dnsAppend(q dns.Question, m *dns.Msg, rr dns.RR) {
 	}
 }
 
-func handleDockerRequest(domain string, tlsConfig *tls.Config, w dns.ResponseWriter, r *dns.Msg) {
+func handleDockerRequest(domain string, domainConfig DomainConfig, w dns.ResponseWriter, r *dns.Msg) {
 	m := new(dns.Msg)
 	m.SetReply(r)
 	defer w.WriteMsg(m)
@@ -211,7 +223,7 @@ func handleDockerRequest(domain string, tlsConfig *tls.Config, w dns.ResponseWri
 		}
 		containerName := name[:len(name)-len(domainSuffix)]
 
-		ips, err := dockerGetIpList(config[domain].Socket, containerName, tlsConfig, config[domain].SwarmNode)
+		ips, err := dockerGetIpList(domainConfig.Socket, containerName, domainConfig.tlsConfig, domainConfig.SwarmNode)
 		if err != nil && strings.Contains(containerName, ".") {
 			// we have something like "db.app", so let's try looking up a "app/db" container (linking!)
 			parts := strings.Split(containerName, ".")
@@ -219,7 +231,7 @@ func handleDockerRequest(domain string, tlsConfig *tls.Config, w dns.ResponseWri
 			for i := range parts {
 				linkedContainerName += "/" + parts[len(parts)-i-1]
 			}
-			ips, err = dockerGetIpList(config[domain].Socket, linkedContainerName, tlsConfig, config[domain].SwarmNode)
+			ips, err = dockerGetIpList(domainConfig.Socket, linkedContainerName, domainConfig.tlsConfig, domainConfig.SwarmNode)
 		}
 		if err != nil {
 			m.SetRcode(r, dns.RcodeNameError)

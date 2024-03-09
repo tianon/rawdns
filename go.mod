@@ -3,6 +3,7 @@ module github.com/tianon/rawdns
 go 1.21
 
 require (
+	github.com/docker-library/meta-scripts v0.0.0-20240308032004-96ed6a9b2bad
 	github.com/miekg/dns v1.1.58
 	github.com/titanous/json5 v1.0.0
 )

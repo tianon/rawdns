@@ -1,3 +1,5 @@
+github.com/docker-library/meta-scripts v0.0.0-20240308032004-96ed6a9b2bad h1:47H9uVRqdgq6lLd2XMVRg+K3KuYKmGF6jkzDVlPLZy8=
+github.com/docker-library/meta-scripts v0.0.0-20240308032004-96ed6a9b2bad/go.mod h1:Lxb/5IT8JwRt7wtvC5uRWDgiIyBKxl7J4Y4OytutTlE=
 github.com/kylelemons/godebug v1.1.0 h1:RPNrshWIDI6G2gRW9EHilWtl7Z6Sb1BR0xunSBf0SNc=
 github.com/kylelemons/godebug v1.1.0/go.mod h1:9/0rRGxNHcop5bhtWyNeEfOS8JIWk580+fNqagV/RAw=
 github.com/miekg/dns v1.1.58 h1:ca2Hdkz+cDg/7eNF6V56jjzuZ4aCAE+DbVkILdQWG/4=
