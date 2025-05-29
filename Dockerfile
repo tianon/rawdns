@@ -5,9 +5,7 @@ RUN apk add --no-cache ca-certificates
 WORKDIR /usr/local/src/rawdns
 
 COPY go.mod go.sum ./
-RUN set -eux; \
-	go mod download; \
-	go mod verify
+RUN go mod download
 
 COPY . .
 

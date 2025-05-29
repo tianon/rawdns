@@ -14,9 +14,7 @@ ENV BUILD_FLAGS="-ldflags '-d -w' ./cmd/rawdns"
 WORKDIR /usr/local/src/rawdns
 
 COPY go.mod go.sum ./
-RUN set -eux; \
-	go mod download; \
-	go mod verify
+RUN go mod download
 
 COPY . .
 
