@@ -9,8 +9,14 @@ import (
 	"net/url"
 )
 
+// TODO use "docker network ls" + "docker network inspect" to get lists of containers + IPs for implementing reverse DNS lookups that don't require inspecting *every* container to resolve! (can even skip "host" and "none" automatically, or even *any* network whose driver is "host" or "null")
+
 var (
 	dockerApiVersions = []string{
+		// https://github.com/moby/moby/pull/51186
+		"v1.52", // Docker 29.0.x
+		"v1.44", // Docker 25.0.x
+
 		// https://github.com/moby/moby/pull/46887
 		"v1.41", // Docker 20.10.x
 
@@ -70,7 +76,7 @@ func dockerGetIpList(dockerHost, containerName string, tlsConfig *tls.Config, sw
 			continue
 		}
 
-		if swarmNode {
+		if swarmNode && container.Node.IP != "" {
 			return []net.IP{net.ParseIP(container.Node.IP)}, nil
 		}
 
