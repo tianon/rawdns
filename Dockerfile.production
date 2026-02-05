@@ -2,7 +2,7 @@ FROM alpine:3.23
 
 WORKDIR /etc/rawdns
 
-ENV RAWDNS_VERSION 1.10
+ENV RAWDNS_VERSION 1.11
 
 RUN set -ex; \
 	\
