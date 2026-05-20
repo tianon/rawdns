@@ -213,6 +213,7 @@ func handleDockerRequest(domain string, domainConfig DomainConfig, w dns.Respons
 	m := new(dns.Msg)
 	m.SetReply(r)
 	m.Authoritative = true
+	m.RecursionAvailable = r.RecursionDesired // lie so nslookup doesn't throw a fit and try another server
 	defer w.WriteMsg(m)
 
 	domainSuffix := "." + dns.Fqdn(domain)
@@ -259,6 +260,7 @@ func handleStaticRequest(config DomainConfig, w dns.ResponseWriter, r *dns.Msg) 
 	m := new(dns.Msg)
 	m.SetReply(r)
 	m.Authoritative = true
+	m.RecursionAvailable = r.RecursionDesired // lie so nslookup doesn't throw a fit and try another server
 	defer w.WriteMsg(m)
 
 	for _, q := range r.Question {
