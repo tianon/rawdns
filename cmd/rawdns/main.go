@@ -212,6 +212,7 @@ func dnsAppend(q dns.Question, m *dns.Msg, rr dns.RR) {
 func handleDockerRequest(domain string, domainConfig DomainConfig, w dns.ResponseWriter, r *dns.Msg) {
 	m := new(dns.Msg)
 	m.SetReply(r)
+	m.Authoritative = true
 	defer w.WriteMsg(m)
 
 	domainSuffix := "." + dns.Fqdn(domain)
@@ -257,6 +258,7 @@ func handleDockerRequest(domain string, domainConfig DomainConfig, w dns.Respons
 func handleStaticRequest(config DomainConfig, w dns.ResponseWriter, r *dns.Msg) {
 	m := new(dns.Msg)
 	m.SetReply(r)
+	m.Authoritative = true
 	defer w.WriteMsg(m)
 
 	for _, q := range r.Question {
