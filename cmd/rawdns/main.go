@@ -286,10 +286,10 @@ func handleStaticRequest(config DomainConfig, w dns.ResponseWriter, r *dns.Msg) 
 				}
 				recM := handleForwardingRaw(config.Nameservers, *config.Randomize, recR, w.RemoteAddr())
 				for _, rr := range recM.Answer {
-					dnsAppend(q, m, rr)
+					dnsAppend(recQ, m, rr)
 				}
 				for _, rr := range recM.Extra {
-					dnsAppend(q, m, rr)
+					dnsAppend(recQ, m, rr)
 				}
 			}
 		}
