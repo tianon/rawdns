@@ -25,7 +25,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: tianon/actions/checkout/composite@581498642ee39d41dc3a801d22b3f7f42a95acc7 # HEAD
-      - uses: actions/setup-go@v5
+      - uses: tianon/actions/setup-go@581498642ee39d41dc3a801d22b3f7f42a95acc7 # HEAD
         with:
           go-version-file: go.mod
       - run: |
