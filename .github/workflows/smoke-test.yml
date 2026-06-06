@@ -24,7 +24,7 @@ jobs:
     name: Go
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: tianon/actions/checkout/composite@581498642ee39d41dc3a801d22b3f7f42a95acc7 # HEAD
       - uses: actions/setup-go@v5
         with:
           go-version-file: go.mod
@@ -37,7 +37,7 @@ jobs:
     name: Dev
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: tianon/actions/checkout/composite@581498642ee39d41dc3a801d22b3f7f42a95acc7 # HEAD
       - name: Build
         run: |
           docker buildx build --pull .
@@ -46,7 +46,7 @@ jobs:
     name: Cross
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: tianon/actions/checkout/composite@581498642ee39d41dc3a801d22b3f7f42a95acc7 # HEAD
       - name: Build
         run: |
           docker buildx build --pull --file Dockerfile.cross .
@@ -55,7 +55,7 @@ jobs:
     name: Prod
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: tianon/actions/checkout/composite@581498642ee39d41dc3a801d22b3f7f42a95acc7 # HEAD
       - name: Build
         run: |
           docker buildx build --pull --file Dockerfile.production .
